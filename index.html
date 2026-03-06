@@ -1033,6 +1033,32 @@ function deleteMeal(id) {
   renderMeals();
 }
 
+function editMeal(id, el) {
+  if (el.querySelector('input')) return;
+  const current = el.textContent;
+  const input = document.createElement('input');
+  input.value = current;
+  input.style.cssText = `font-family:var(--sans);font-size:13px;background:var(--surface);border:1px solid var(--accent-dim);color:var(--text);padding:2px 6px;width:160px;outline:none;`;
+  el.textContent = '';
+  el.appendChild(input);
+  input.focus();
+  input.select();
+  const commit = () => {
+    const val = input.value.trim();
+    if (!val) { renderMeals(); return; }
+    const data = loadMeals();
+    const m = data.find(m => m.id === id);
+    if (m) { m.name = val; saveMeals(data); }
+    renderMeals();
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') input.blur();
+    if (e.key === 'Escape') renderMeals();
+    e.stopPropagation();
+  });
+}
+
 function renderMeals() {
   const data = loadMeals();
   const container = document.getElementById('mealList');
@@ -1059,7 +1085,7 @@ function renderMeals() {
     grouped[date].forEach(m => {
       const el = document.createElement('div');
       el.className = 'meal-entry';
-      el.innerHTML = `<span class="meal-entry-name">${m.name}</span><button class="meal-entry-del" onclick="deleteMeal(${m.id})">✕</button>`;
+      el.innerHTML = `<span class="meal-entry-name editable" title="클릭해서 수정" onclick="editMeal(${m.id},this)">${m.name}</span><button class="meal-entry-del" onclick="deleteMeal(${m.id})">✕</button>`;
       block.appendChild(el);
     });
     container.appendChild(block);
