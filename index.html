@@ -486,9 +486,27 @@
     text-align: center;
   }
 
+  /* MEAL LOG */
+  .meal-layout { display: grid; grid-template-columns: 1fr 340px; gap: 24px; align-items: start; }
+  .meal-add-form { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .meal-add-form input[type="date"] { font-family: var(--mono); font-size: 13px; background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 8px 12px; outline: none; }
+  .meal-add-form input[type="date"]:focus { border-color: var(--border-bright); }
+  .meal-list { display: flex; flex-direction: column; gap: 1px; }
+  .meal-day-group { border: 1px solid var(--border); margin-bottom: 8px; }
+  .meal-day-header { padding: 8px 12px; background: var(--surface); font-family: var(--mono); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; color: var(--text-dim); display: flex; justify-content: space-between; }
+  .meal-day-header .meal-day-label { color: var(--accent); }
+  .meal-entry { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg); border-top: 1px solid var(--border); transition: background 0.1s; }
+  .meal-entry:hover { background: var(--surface); }
+  .meal-entry-name { flex: 1; font-size: 13px; }
+  .meal-entry-del { font-family: var(--mono); font-size: 10px; color: transparent; border: none; background: none; padding: 2px 4px; cursor: pointer; transition: color 0.1s; }
+  .meal-entry:hover .meal-entry-del { color: var(--danger); }
+  .meal-empty { font-family: var(--mono); font-size: 12px; color: var(--text-dim); padding: 40px 0; text-align: center; }
+  .meal-days-input { width: 60px; }
+
   @media (max-width: 700px) {
     .main-grid { grid-template-columns: 1fr; }
     .recipe-layout { grid-template-columns: 1fr; }
+    .meal-layout { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -534,6 +552,7 @@
 <div class="tabs">
   <button class="tab-btn active" onclick="switchTab('ingredients')">재료창고</button>
   <button class="tab-btn" onclick="switchTab('recipes')">레시피</button>
+  <button class="tab-btn" onclick="switchTab('meals')">식사기록</button>
 </div>
 
 <div id="tab-ingredients" class="tab-panel active">
@@ -616,8 +635,41 @@
   </div>
 </div>
 
+<div id="tab-meals" class="tab-panel">
+  <div class="meal-layout">
+    <div>
+      <div class="meal-add-form">
+        <input type="date" id="mealDate">
+        <input class="name-input" id="mealName" type="text" placeholder="먹은 음식 이름" onkeydown="if(event.key==='Enter') addMeal()">
+        <button class="accent" onclick="addMeal()">+ 추가</button>
+      </div>
+      <div id="mealList"></div>
+    </div>
+    <div class="sidebar">
+      <div class="panel">
+        <div class="panel-header">기록 통계</div>
+        <div class="panel-body">
+          <div class="stat-grid" id="mealStats"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header">프롬프트 반영 설정</div>
+        <div class="panel-body">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:8px">최근 며칠 기록을 프롬프트에 포함할지:</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <input class="meal-days-input" type="number" id="mealDays" value="7" min="1" max="30" style="font-family:var(--mono);font-size:13px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 10px;outline:none">
+            <span style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">일</span>
+          </div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:10px;line-height:1.7">재료창고 탭의 프롬프트 생성 시 자동으로 포함됩니다.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 const STORAGE_KEY = 'kitchen_ingredients_v1';
+const MEAL_KEY = 'kitchen_meals_v1';
 const CATEGORIES = ['육류·해산물','채소','유제품·달걀','양념·소스','반찬','건식품·통조림','냉동식품','기타'];
 
 function load() {
@@ -775,7 +827,22 @@ function generatePrompt() {
     return `[${cat}] ${items.map(i => i.name + (i.frozen ? '(냉동)' : '') + (i.qty ? `(${i.qty})` : '')).join(', ')}`;
   }).filter(Boolean).join('\n');
 
-  const prompt = `현재 보유 재료:\n${grouped}\n\n${extra ? '조건: ' + extra + '\n\n' : ''}이 재료들로 만들 수 있는 식사 3가지를 추천해줘. 각각 재료 활용도, 난이도, 조리 시간을 간결하게 알려줘.`;
+  // recent meals
+  const days = parseInt(document.getElementById('mealDays')?.value || '7');
+  const meals = loadMeals();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffStr = cutoff.toISOString().slice(0,10);
+  const recentMeals = meals.filter(m => m.date >= cutoffStr);
+  let mealSection = '';
+  if (recentMeals.length > 0) {
+    const grouped = {};
+    recentMeals.forEach(m => { if (!grouped[m.date]) grouped[m.date] = []; grouped[m.date].push(m.name); });
+    const lines = Object.entries(grouped).sort((a,b)=>a[0]>b[0]?-1:1).map(([d,ns]) => `${d}: ${ns.join(', ')}`).join('\n');
+    mealSection = `\n최근 ${days}일 식사 기록:\n${lines}\n`;
+  }
+
+  const prompt = `현재 보유 재료:\n${grouped}\n${mealSection}\n${extra ? '조건: ' + extra + '\n\n' : ''}이 재료들로 만들 수 있는 식사 3가지를 추천해줘.${recentMeals.length > 0 ? ' 최근 식사 기록을 참고해서 겹치지 않게 다양하게 추천해줘.' : ''} 각각 재료 활용도, 난이도, 조리 시간을 간결하게 알려줘.`;
 
   document.getElementById('generatedPrompt').value = prompt;
   document.getElementById('promptBox').style.display = 'block';
@@ -795,7 +862,8 @@ function exportJSON() {
     version: 2,
     exportedAt: new Date().toISOString(),
     ingredients: load(),
-    recipes: loadRecipes()
+    recipes: loadRecipes(),
+    meals: loadMeals()
   }, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -812,11 +880,13 @@ function importJSON(event) {
       const json = JSON.parse(e.target.result);
       const ingredients = json.ingredients || json;
       const recipes = json.recipes || [];
+      const meals = json.meals || [];
       if (!Array.isArray(ingredients)) throw new Error('형식 오류');
-      const msg = `재료 ${ingredients.length}개, 레시피 ${recipes.length}개를 불러옵니다. 기존 데이터를 덮어씁니다.`;
+      const msg = `재료 ${ingredients.length}개, 레시피 ${recipes.length}개, 식사기록 ${meals.length}개를 불러옵니다. 기존 데이터를 덮어씁니다.`;
       if (confirm(msg)) {
         save(ingredients);
         saveRecipes(recipes);
+        saveMeals(meals);
         renderAll();
       }
     } catch (err) { alert('파일 오류: ' + err.message); }
@@ -843,10 +913,12 @@ function switchTab(name) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-' + name).classList.add('active');
+  const labels = { ingredients: '재료창고', recipes: '레시피', meals: '식사기록' };
   document.querySelectorAll('.tab-btn').forEach(b => {
-    if (b.textContent.trim() === (name === 'ingredients' ? '재료창고' : '레시피')) b.classList.add('active');
+    if (b.textContent.trim() === labels[name]) b.classList.add('active');
   });
   if (name === 'recipes') renderRecipes();
+  if (name === 'meals') { initMealDate(); renderMeals(); }
 }
 
 // RECIPES
@@ -932,6 +1004,72 @@ function deleteRecipe(id, e) {
   else renderRecipes();
 }
 
+// MEAL LOG
+function loadMeals() {
+  try { return JSON.parse(localStorage.getItem(MEAL_KEY)) || []; }
+  catch { return []; }
+}
+function saveMeals(data) { localStorage.setItem(MEAL_KEY, JSON.stringify(data)); }
+
+function initMealDate() {
+  const el = document.getElementById('mealDate');
+  if (el && !el.value) el.value = new Date().toISOString().slice(0,10);
+}
+
+function addMeal() {
+  const date = document.getElementById('mealDate').value;
+  const name = document.getElementById('mealName').value.trim();
+  if (!date || !name) return;
+  const data = loadMeals();
+  data.push({ id: Date.now(), date, name });
+  saveMeals(data);
+  document.getElementById('mealName').value = '';
+  renderMeals();
+  document.getElementById('mealName').focus();
+}
+
+function deleteMeal(id) {
+  saveMeals(loadMeals().filter(m => m.id !== id));
+  renderMeals();
+}
+
+function renderMeals() {
+  const data = loadMeals();
+  const container = document.getElementById('mealList');
+  if (!container) return;
+
+  if (data.length === 0) {
+    container.innerHTML = '<div class="meal-empty">기록된 식사가 없습니다.</div>';
+    document.getElementById('mealStats').innerHTML = '<div class="stat-item"><span class="stat-num">0</span><span class="stat-label">총 기록</span></div><div class="stat-item"><span class="stat-num">0</span><span class="stat-label">기록일수</span></div>';
+    return;
+  }
+
+  // group by date descending
+  const grouped = {};
+  data.forEach(m => { if (!grouped[m.date]) grouped[m.date] = []; grouped[m.date].push(m); });
+  const sortedDates = Object.keys(grouped).sort((a,b) => a>b?-1:1);
+
+  container.innerHTML = '';
+  sortedDates.forEach(date => {
+    const block = document.createElement('div');
+    block.className = 'meal-day-group';
+    const d = new Date(date + 'T00:00:00');
+    const label = `${d.getMonth()+1}/${d.getDate()} (${['일','월','화','수','목','금','토'][d.getDay()]})`;
+    block.innerHTML = `<div class="meal-day-header"><span class="meal-day-label">${label}</span><span>${grouped[date].length}끼</span></div>`;
+    grouped[date].forEach(m => {
+      const el = document.createElement('div');
+      el.className = 'meal-entry';
+      el.innerHTML = `<span class="meal-entry-name">${m.name}</span><button class="meal-entry-del" onclick="deleteMeal(${m.id})">✕</button>`;
+      block.appendChild(el);
+    });
+    container.appendChild(block);
+  });
+
+  document.getElementById('mealStats').innerHTML = `
+    <div class="stat-item"><span class="stat-num">${data.length}</span><span class="stat-label">총 기록</span></div>
+    <div class="stat-item"><span class="stat-num">${sortedDates.length}</span><span class="stat-label">기록일수</span></div>
+  `;
+}
+
 </script>
-</body>
 </html>
