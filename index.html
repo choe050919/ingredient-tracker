@@ -1051,15 +1051,18 @@ function renderRecipes() {
       el.dataset.idx = idx;
       el.innerHTML = `<span style="display:flex;align-items:center;gap:0;flex:1;min-width:0"><span class="recipe-drag-handle" title="드래그하여 순서 변경"><i class="ph ph-dots-six-vertical"></i></span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.title || '(제목 없음)'}</span></span><span style="display:flex;gap:2px;flex-shrink:0"><button class="recipe-item-copy" onclick="copyRecipe(${r.id},event)" title="복사"><i class="ph ph-clipboard"></i></button><button class="recipe-item-del" onclick="deleteRecipe(${r.id},event)"><i class="ph ph-x"></i></button></span>`;
 
+      const docDragOver = e => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; };
       el.addEventListener('dragstart', e => {
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', idx);
         el.classList.add('dragging');
         container.classList.add('drag-active');
+        document.addEventListener('dragover', docDragOver);
       });
       el.addEventListener('dragend', () => {
         el.classList.remove('dragging');
         container.classList.remove('drag-active');
+        document.removeEventListener('dragover', docDragOver);
         container.querySelectorAll('.recipe-item').forEach(i => {
           i.classList.remove('drag-over-above', 'drag-over-below');
         });
