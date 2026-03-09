@@ -643,7 +643,10 @@
 
 <div id="helpModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'" onkeydown="if(event.key==='Escape')this.style.display='none'">
   <div style="background:var(--surface);border:1px solid var(--border-bright);max-width:520px;width:90%;padding:28px;font-size:13px;line-height:1.8;position:relative;max-height:85vh;overflow-y:auto;">
-    <div style="font-family:var(--mono);font-size:16px;font-weight:700;color:var(--accent);margin-bottom:16px;">사용법</div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-family:var(--mono);font-size:16px;font-weight:700;color:var(--accent);">사용법</div>
+      <button onclick="document.getElementById('helpModal').style.display='none'" style="border:none;background:none;color:var(--text-dim);cursor:pointer;font-size:18px;padding:4px"><i class="ph ph-x"></i></button>
+    </div>
 
     <div class="help-tabs" style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;">
       <button class="help-tab-btn active" onclick="switchHelpTab('ingredients',this)" style="font-family:var(--mono);font-size:11px;padding:8px 14px;border:none;border-bottom:2px solid var(--accent);background:none;color:var(--accent);cursor:pointer">재료창고</button>
@@ -690,7 +693,6 @@
       <p>모든 데이터는 브라우저 로컬 저장소에 보관됩니다. <b>브라우저 데이터를 삭제하면 함께 사라질 수 있으니</b> 주기적으로 <b>백업 내보내기</b>를 권장합니다.</p>
     </div>
 
-    <button onclick="document.getElementById('helpModal').style.display='none'" style="margin-top:20px;width:100%" class="accent">닫기</button>
   </div>
 </div>
 
