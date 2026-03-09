@@ -513,6 +513,29 @@
   .meal-empty { font-family: var(--mono); font-size: 12px; color: var(--text-dim); padding: 40px 0; text-align: center; }
   .meal-days-input { width: 60px; }
 
+  /* TOAST */
+  .toast {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--green);
+    background: var(--surface);
+    border: 1px solid var(--green-dim);
+    padding: 10px 20px;
+    border-radius: 6px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 200;
+  }
+  .toast.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
   @media (max-width: 700px) {
     .main-grid { grid-template-columns: 1fr; }
     .recipe-layout { grid-template-columns: 1fr; }
@@ -611,7 +634,6 @@
         <div id="promptBox" style="display:none">
           <textarea class="ai-prompt-area" id="generatedPrompt" style="min-height:160px;font-size:12px;color:#a0a090" readonly></textarea>
           <button class="accent" style="width:100%" onclick="copyPrompt()">📋 복사하기</button>
-          <div id="copyMsg" style="font-family:var(--mono);font-size:11px;color:var(--green);margin-top:6px;display:none">복사됨 ✓</div>
         </div>
       </div>
     </div>
@@ -677,7 +699,18 @@
   </div>
 </div>
 
+<div class="toast" id="toast"></div>
+
 <script>
+let toastTimer;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('visible');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('visible'), 2000);
+}
+
 const STORAGE_KEY = 'kitchen_ingredients_v1';
 const MEAL_KEY = 'kitchen_meals_v1';
 const CATEGORIES = ['육류·해산물','채소','유제품·달걀','양념·소스','반찬','건식품·통조림','냉동식품','기타'];
@@ -856,15 +889,11 @@ function generatePrompt() {
 
   document.getElementById('generatedPrompt').value = prompt;
   document.getElementById('promptBox').style.display = 'block';
-  document.getElementById('copyMsg').style.display = 'none';
 }
 
 function copyPrompt() {
   const text = document.getElementById('generatedPrompt').value;
-  navigator.clipboard.writeText(text).then(() => {
-    document.getElementById('copyMsg').style.display = 'block';
-    setTimeout(() => document.getElementById('copyMsg').style.display = 'none', 2000);
-  });
+  navigator.clipboard.writeText(text).then(() => showToast('프롬프트가 복사되었습니다 ✓'));
 }
 
 function exportJSON() {
@@ -1017,6 +1046,7 @@ function copyRecipe(id, e) {
     btn.classList.add('copied');
     btn.textContent = '✓';
     setTimeout(() => { btn.classList.remove('copied'); btn.textContent = '📋'; }, 1500);
+    showToast('레시피가 복사되었습니다 ✓');
   });
 }
 
