@@ -435,16 +435,26 @@
   .recipe-item:hover { background: var(--surface); }
   .recipe-item.selected { background: var(--accent-dim); color: var(--accent); }
 
-  .recipe-item-del {
+  .recipe-item-del, .recipe-item-copy {
     font-family: var(--mono);
     font-size: 10px;
     color: transparent;
     border: none;
     background: none;
     cursor: pointer;
-    padding: 2px 4px;
+    width: 24px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.15s;
   }
   .recipe-item:hover .recipe-item-del { color: var(--danger); }
+  .recipe-item-del:hover { color: #ff6b6b !important; background: var(--danger-dim); }
+  .recipe-item:hover .recipe-item-copy { color: var(--text-dim); }
+  .recipe-item-copy:hover { color: var(--accent) !important; background: var(--accent-dim); }
+  .recipe-item:hover .recipe-item-copy.copied { color: var(--green) !important; }
 
   .recipe-editor { display: flex; flex-direction: column; gap: 10px; max-width: 600px; width: 100%; margin: 0 auto; }
 
@@ -944,7 +954,7 @@ function renderRecipes() {
     data.forEach(r => {
       const el = document.createElement('div');
       el.className = 'recipe-item' + (r.id === currentRecipeId ? ' selected' : '');
-      el.innerHTML = `<span>${r.title || '(제목 없음)'}</span><button class="recipe-item-del" onclick="deleteRecipe(${r.id},event)">✕</button>`;
+      el.innerHTML = `<span>${r.title || '(제목 없음)'}</span><span style="display:flex;gap:2px"><button class="recipe-item-copy" onclick="copyRecipe(${r.id},event)" title="복사">📋</button><button class="recipe-item-del" onclick="deleteRecipe(${r.id},event)">✕</button></span>`;
       el.addEventListener('click', () => openRecipe(r.id));
       container.appendChild(el);
     });
@@ -994,6 +1004,20 @@ function cancelRecipe() {
   document.getElementById('recipeForm').style.display = 'none';
   document.getElementById('recipeEmptyMsg').style.display = 'block';
   renderRecipes();
+}
+
+function copyRecipe(id, e) {
+  e.stopPropagation();
+  const data = loadRecipes();
+  const r = data.find(r => r.id === id);
+  if (!r) return;
+  const text = (r.title ? r.title + '\n\n' : '') + (r.body || '');
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = e.target;
+    btn.classList.add('copied');
+    btn.textContent = '✓';
+    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = '📋'; }, 1500);
+  });
 }
 
 function deleteRecipe(id, e) {
