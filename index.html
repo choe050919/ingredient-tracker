@@ -244,7 +244,7 @@
     transition: opacity 0.15s;
     color: inherit;
   }
-  .item-freeze.on { opacity: 1; }
+  .item-freeze.on { opacity: 1; color: #5bc0eb; }
   .ingredient-item:hover .item-freeze { opacity: 0.5; }
   .ingredient-item:hover .item-freeze.on { opacity: 1; }
 
@@ -559,7 +559,20 @@
     .recipe-layout { grid-template-columns: 1fr; }
     .meal-layout { grid-template-columns: 1fr; }
   }
+  /* Phosphor Icons */
+  i[class*="ph"] {
+    vertical-align: -0.125em;
+    line-height: 1;
+  }
+  .cat-toggle i {
+    display: inline-block;
+    transition: transform 0.15s;
+  }
+  .collapsed .cat-toggle i {
+    transform: rotate(-90deg);
+  }
 </style>
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
 </head>
 <body>
 
@@ -567,7 +580,7 @@
   <h1>재료창고</h1>
   <span class="sub">// INGREDIENT TRACKER</span>
   <div class="header-actions">
-    <button id="themeToggle" onclick="toggleTheme()">☀️ 라이트</button>
+    <button id="themeToggle" onclick="toggleTheme()"><i class="ph ph-sun"></i> 라이트</button>
     <button onclick="document.getElementById('helpModal').style.display='flex'">?  사용법</button>
     <button onclick="exportJSON()">백업 내보내기</button>
     <label><button onclick="document.getElementById('importFile').click()">백업 불러오기</button></label>
@@ -586,10 +599,10 @@
     <p>이름이나 수량을 클릭하면 바로 편집 가능. 엔터로 저장, Esc로 취소.</p>
 
     <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin:16px 0 6px;letter-spacing:0.08em;">카테고리 이동</div>
-    <p>항목 왼쪽 <b>⠿</b> 핸들을 잡고 다른 카테고리 헤더에 드롭.</p>
+    <p>항목 왼쪽 <b><i class="ph ph-dots-six-vertical"></i></b> 핸들을 잡고 다른 카테고리 헤더에 드롭.</p>
 
     <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin:16px 0 6px;letter-spacing:0.08em;">냉동 표시</div>
-    <p>항목에 마우스를 올리면 <b>❄️</b> 버튼이 나타남. 클릭하면 냉동 상태로 표시되고 AI 프롬프트에 자동 반영.</p>
+    <p>항목에 마우스를 올리면 <b><i class="ph ph-snowflake"></i></b> 버튼이 나타남. 클릭하면 냉동 상태로 표시되고 AI 프롬프트에 자동 반영.</p>
 
     <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin:16px 0 6px;letter-spacing:0.08em;">AI 요리 추천</div>
     <p>오른쪽 패널에서 <b>프롬프트 생성</b> → 복사 → AI 챗봇에 붙여넣기.</p>
@@ -652,7 +665,7 @@
         <button class="green" style="width:100%;margin-bottom:8px" onclick="generatePrompt()">프롬프트 생성</button>
         <div id="promptBox" style="display:none">
           <textarea class="ai-prompt-area" id="generatedPrompt" style="min-height:160px;font-size:12px;color:var(--text-dim)" readonly></textarea>
-          <button class="accent" style="width:100%" onclick="copyPrompt()">📋 복사하기</button>
+          <button class="accent" style="width:100%" onclick="copyPrompt()"><i class="ph ph-clipboard"></i> 복사하기</button>
         </div>
       </div>
     </div>
@@ -663,7 +676,7 @@
 </div>
 
 <div id="tab-recipes" class="tab-panel">
-  <button id="recipePanelToggle" onclick="toggleRecipePanel()" style="font-family:var(--mono);font-size:11px;margin-bottom:12px;padding:5px 12px;background:var(--surface);border:1px solid var(--border);color:var(--text-dim);cursor:pointer">◀ 목록 접기</button>
+  <button id="recipePanelToggle" onclick="toggleRecipePanel()" style="font-family:var(--mono);font-size:11px;margin-bottom:12px;padding:5px 12px;background:var(--surface);border:1px solid var(--border);color:var(--text-dim);cursor:pointer"><i class="ph ph-caret-left"></i> 목록 접기</button>
   <div class="recipe-layout">
     <div id="recipeLeftPanel">
       <div class="recipe-list" id="recipeList">
@@ -725,7 +738,7 @@
 function applyTheme(theme) {
   document.documentElement.setAttribute('data-theme', theme);
   const btn = document.getElementById('themeToggle');
-  btn.textContent = theme === 'light' ? '🌙 다크' : '☀️ 라이트';
+  btn.innerHTML = theme === 'light' ? '<i class="ph ph-moon"></i> 다크' : '<i class="ph ph-sun"></i> 라이트';
 }
 
 function toggleTheme() {
@@ -796,7 +809,7 @@ function renderAll(search = '') {
       <div class="cat-header drop-zone" data-cat="${cat}" onclick="this.parentElement.classList.toggle('collapsed')">
         <span class="cat-label">${cat}</span>
         <span class="cat-count">${items.length}${q && items.length !== allItems.length ? '/'+allItems.length : ''}</span>
-        <span class="cat-toggle">▾</span>
+        <span class="cat-toggle"><i class="ph ph-caret-down"></i></span>
       </div>
     `;
     const header = block.querySelector('.cat-header');
@@ -828,11 +841,11 @@ function renderAll(search = '') {
         });
         el.addEventListener('dragend', () => el.classList.remove('dragging'));
         el.innerHTML = `
-          <span class="drag-handle" title="드래그">⠿</span>
+          <span class="drag-handle" title="드래그"><i class="ph ph-dots-six-vertical"></i></span>
           <span class="item-name editable" title="클릭해서 수정" onclick="startEdit(${item.id},'name',this)">${item.name}</span>
           <span class="item-qty editable" title="클릭해서 수정" onclick="startEdit(${item.id},'qty',this)">${item.qty || '—'}</span>
-          <button class="item-freeze ${item.frozen ? 'on' : ''}" onclick="toggleFrozen(${item.id})" title="냉동 여부">❄️</button>
-          <button class="item-del" onclick="removeIngredient(${item.id})" title="삭제">✕</button>
+          <button class="item-freeze ${item.frozen ? 'on' : ''}" onclick="toggleFrozen(${item.id})" title="냉동 여부"><i class="ph ph-snowflake"></i></button>
+          <button class="item-del" onclick="removeIngredient(${item.id})" title="삭제"><i class="ph ph-x"></i></button>
         `;
         list.appendChild(el);
       });
@@ -928,7 +941,7 @@ function generatePrompt() {
 
 function copyPrompt() {
   const text = document.getElementById('generatedPrompt').value;
-  navigator.clipboard.writeText(text).then(() => showToast('프롬프트가 복사되었습니다 ✓'));
+  navigator.clipboard.writeText(text).then(() => showToast('프롬프트가 복사되었습니다'));
 }
 
 function exportJSON() {
@@ -979,7 +992,7 @@ function toggleRecipePanel() {
   panel.style.display = collapsed ? '' : 'none';
   const layout = document.querySelector('.recipe-layout');
   layout.style.gridTemplateColumns = collapsed ? '260px 1fr' : '1fr';
-  toggle.textContent = collapsed ? '◀ 목록 접기' : '▶ 목록 펼치기';
+  toggle.innerHTML = collapsed ? '<i class="ph ph-caret-left"></i> 목록 접기' : '<i class="ph ph-caret-right"></i> 목록 펼치기';
 }
 
 // TABS
@@ -1018,7 +1031,7 @@ function renderRecipes() {
     data.forEach(r => {
       const el = document.createElement('div');
       el.className = 'recipe-item' + (r.id === currentRecipeId ? ' selected' : '');
-      el.innerHTML = `<span>${r.title || '(제목 없음)'}</span><span style="display:flex;gap:2px"><button class="recipe-item-copy" onclick="copyRecipe(${r.id},event)" title="복사">📋</button><button class="recipe-item-del" onclick="deleteRecipe(${r.id},event)">✕</button></span>`;
+      el.innerHTML = `<span>${r.title || '(제목 없음)'}</span><span style="display:flex;gap:2px"><button class="recipe-item-copy" onclick="copyRecipe(${r.id},event)" title="복사"><i class="ph ph-clipboard"></i></button><button class="recipe-item-del" onclick="deleteRecipe(${r.id},event)"><i class="ph ph-x"></i></button></span>`;
       el.addEventListener('click', () => openRecipe(r.id));
       container.appendChild(el);
     });
@@ -1077,11 +1090,11 @@ function copyRecipe(id, e) {
   if (!r) return;
   const text = (r.title ? r.title + '\n\n' : '') + (r.body || '');
   navigator.clipboard.writeText(text).then(() => {
-    const btn = e.target;
+    const btn = e.target.closest('.recipe-item-copy');
     btn.classList.add('copied');
-    btn.textContent = '✓';
-    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = '📋'; }, 1500);
-    showToast('레시피가 복사되었습니다 ✓');
+    btn.innerHTML = '<i class="ph ph-check"></i>';
+    setTimeout(() => { btn.classList.remove('copied'); btn.innerHTML = '<i class="ph ph-clipboard"></i>'; }, 1500);
+    showToast('레시피가 복사되었습니다');
   });
 }
 
@@ -1174,7 +1187,7 @@ function renderMeals() {
     grouped[date].forEach(m => {
       const el = document.createElement('div');
       el.className = 'meal-entry';
-      el.innerHTML = `<span class="meal-entry-name editable" title="클릭해서 수정" onclick="editMeal(${m.id},this)">${m.name}</span><button class="meal-entry-del" onclick="deleteMeal(${m.id})">✕</button>`;
+      el.innerHTML = `<span class="meal-entry-name editable" title="클릭해서 수정" onclick="editMeal(${m.id},this)">${m.name}</span><button class="meal-entry-del" onclick="deleteMeal(${m.id})"><i class="ph ph-x"></i></button>`;
       block.appendChild(el);
     });
     container.appendChild(block);
