@@ -344,6 +344,45 @@
 
   .ai-prompt-area:focus { border-color: var(--border-bright); }
 
+  .recipe-check-list {
+    max-height: 140px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .recipe-check-list-header {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .recipe-check-list-header button {
+    font-size: 10px;
+    padding: 2px 6px;
+    border: none;
+    background: none;
+    color: var(--accent);
+    cursor: pointer;
+  }
+  .recipe-check-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .recipe-check-item:hover { background: var(--surface); }
+  .recipe-check-item input[type="checkbox"] { accent-color: var(--accent); cursor: pointer; }
+  .recipe-check-list.collapsed .recipe-check-body { display: none; }
+  .recipe-check-list.collapsed .recipe-check-list-header i { transform: rotate(-90deg); }
+  .recipe-check-list-header i { display: inline-block; transition: transform 0.15s; }
+
   .ai-response {
     font-size: 13px;
     line-height: 1.7;
@@ -676,6 +715,7 @@
       <div class="panel-header">AI 프롬프트 생성</div>
       <div class="panel-body">
         <textarea class="ai-prompt-area" id="aiExtra" placeholder="추가 조건 (선택)&#10;예: 밥 없음, 20분 이내, 간단한 것"></textarea>
+        <div id="recipeCheckList" style="margin-bottom:8px"></div>
         <button class="green" style="width:100%;margin-bottom:8px" onclick="generatePrompt()">프롬프트 생성</button>
         <div id="promptBox" style="display:none">
           <textarea class="ai-prompt-area" id="generatedPrompt" style="min-height:160px;font-size:12px;color:var(--text-dim)" readonly></textarea>
@@ -920,6 +960,37 @@ function renderStats(data) {
     <div class="stat-item"><span class="stat-num">${total}</span><span class="stat-label">총 재료</span></div>
     <div class="stat-item"><span class="stat-num">${catCount}</span><span class="stat-label">카테고리</span></div>
   `;
+  renderRecipeCheckList();
+}
+
+function renderRecipeCheckList() {
+  const container = document.getElementById('recipeCheckList');
+  if (!container) return;
+  const recipes = loadRecipes();
+  if (recipes.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  const checkboxes = recipes.map(r =>
+    `<label class="recipe-check-item"><input type="checkbox" value="${r.id}" checked><span>${r.title || '(제목 없음)'}</span></label>`
+  ).join('');
+  container.innerHTML = `<div class="recipe-check-list"><div class="recipe-check-list-header" onclick="this.parentElement.classList.toggle('collapsed')" style="cursor:pointer"><span><i class="ph ph-caret-down" style="font-size:10px"></i> 레시피 포함 (<span id="recipeCheckCount">${recipes.length}</span>/${recipes.length})</span><button onclick="event.stopPropagation();toggleAllRecipeChecks()">전체 토글</button></div><div class="recipe-check-body">${checkboxes}</div></div>`;
+  container.querySelector('.recipe-check-list').classList.add('collapsed');
+  container.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.addEventListener('change', updateRecipeCheckCount));
+}
+
+function updateRecipeCheckCount() {
+  const boxes = document.querySelectorAll('#recipeCheckList input[type="checkbox"]');
+  const checked = Array.from(boxes).filter(b => b.checked).length;
+  const el = document.getElementById('recipeCheckCount');
+  if (el) el.textContent = checked;
+}
+
+function toggleAllRecipeChecks() {
+  const boxes = document.querySelectorAll('#recipeCheckList input[type="checkbox"]');
+  const allChecked = Array.from(boxes).every(b => b.checked);
+  boxes.forEach(b => b.checked = !allChecked);
+  updateRecipeCheckCount();
 }
 
 function generatePrompt() {
@@ -948,7 +1019,17 @@ function generatePrompt() {
     mealSection = `\n최근 ${days}일 식사 기록:\n${lines}\n`;
   }
 
-  const prompt = `현재 보유 재료:\n${grouped}\n${mealSection}\n${extra ? '조건: ' + extra + '\n\n' : ''}이 재료들로 만들 수 있는 식사 3가지를 추천해줘.${recentMeals.length > 0 ? ' 최근 식사 기록을 참고해서 겹치지 않게 다양하게 추천해줘.' : ''} 각각 재료 활용도, 난이도, 조리 시간을 간결하게 알려줘.`;
+  // selected recipes
+  let recipeSection = '';
+  const checkedIds = Array.from(document.querySelectorAll('#recipeCheckList input[type="checkbox"]:checked')).map(cb => parseInt(cb.value));
+  if (checkedIds.length > 0) {
+    const allRecipes = loadRecipes();
+    const selected = allRecipes.filter(r => checkedIds.includes(r.id));
+    const recipeLines = selected.map(r => `- ${r.title || '(제목 없음)'}`).join('\n');
+    recipeSection = `\n알고 있는 레시피:\n${recipeLines}\n`;
+  }
+
+  const prompt = `현재 보유 재료:\n${grouped}\n${mealSection}${recipeSection}\n${extra ? '조건: ' + extra + '\n\n' : ''}이 재료들로 만들 수 있는 식사 3가지를 추천해줘.${recipeSection ? ' 가능하면 내가 알고 있는 레시피를 활용해줘.' : ''}${recentMeals.length > 0 ? ' 최근 식사 기록을 참고해서 겹치지 않게 다양하게 추천해줘.' : ''} 각각 재료 활용도, 난이도, 조리 시간을 간결하게 알려줘.`;
 
   document.getElementById('generatedPrompt').value = prompt;
   document.getElementById('promptBox').style.display = 'block';
@@ -997,8 +1078,7 @@ function importJSON(event) {
   event.target.value = '';
 }
 
-// init
-renderAll();
+// init deferred to end of script
 
 function toggleRecipePanel() {
   const panel = document.getElementById('recipeLeftPanel');
@@ -1283,6 +1363,9 @@ function renderMeals() {
     <div class="stat-item"><span class="stat-num">${sortedDates.length}</span><span class="stat-label">기록일수</span></div>
   `;
 }
+
+// init
+renderAll();
 
 </script>
 </html>
