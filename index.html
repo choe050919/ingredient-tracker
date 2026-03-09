@@ -641,27 +641,54 @@
   </div>
 </header>
 
-<div id="helpModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">
-  <div style="background:var(--surface);border:1px solid var(--border-bright);max-width:480px;width:90%;padding:28px;font-size:13px;line-height:1.8;position:relative;">
-    <div style="font-family:var(--mono);font-size:16px;font-weight:700;color:var(--accent);margin-bottom:20px;">재료창고 사용법</div>
+<div id="helpModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'" onkeydown="if(event.key==='Escape')this.style.display='none'">
+  <div style="background:var(--surface);border:1px solid var(--border-bright);max-width:520px;width:90%;padding:28px;font-size:13px;line-height:1.8;position:relative;max-height:85vh;overflow-y:auto;">
+    <div style="font-family:var(--mono);font-size:16px;font-weight:700;color:var(--accent);margin-bottom:16px;">사용법</div>
 
-    <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:6px;letter-spacing:0.08em;">기본</div>
-    <p>이름 입력 → 수량/메모(선택) → 카테고리 선택 → <b>+ 추가</b> 또는 엔터</p>
+    <div class="help-tabs" style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px;">
+      <button class="help-tab-btn active" onclick="switchHelpTab('ingredients',this)" style="font-family:var(--mono);font-size:11px;padding:8px 14px;border:none;border-bottom:2px solid var(--accent);background:none;color:var(--accent);cursor:pointer">재료창고</button>
+      <button class="help-tab-btn" onclick="switchHelpTab('recipes',this)" style="font-family:var(--mono);font-size:11px;padding:8px 14px;border:none;border-bottom:2px solid transparent;background:none;color:var(--text-dim);cursor:pointer">레시피</button>
+      <button class="help-tab-btn" onclick="switchHelpTab('meals',this)" style="font-family:var(--mono);font-size:11px;padding:8px 14px;border:none;border-bottom:2px solid transparent;background:none;color:var(--text-dim);cursor:pointer">식사기록</button>
+      <button class="help-tab-btn" onclick="switchHelpTab('general',this)" style="font-family:var(--mono);font-size:11px;padding:8px 14px;border:none;border-bottom:2px solid transparent;background:none;color:var(--text-dim);cursor:pointer">공통</button>
+    </div>
 
-    <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin:16px 0 6px;letter-spacing:0.08em;">수정</div>
-    <p>이름이나 수량을 클릭하면 바로 편집 가능. 엔터로 저장, Esc로 취소.</p>
+    <div id="help-ingredients" class="help-section">
+      <p style="color:var(--text-dim);margin-bottom:14px;">보유 중인 재료를 카테고리별로 관리합니다.</p>
 
-    <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin:16px 0 6px;letter-spacing:0.08em;">카테고리 이동</div>
-    <p>항목 왼쪽 <b><i class="ph ph-dots-six-vertical"></i></b> 핸들을 잡고 다른 카테고리 헤더에 드롭.</p>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:6px;letter-spacing:0.08em;">수정·삭제</div>
+      <p>이름이나 수량을 클릭하면 바로 편집 가능. 마우스를 올리면 삭제 버튼이 나타남.</p>
 
-    <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin:16px 0 6px;letter-spacing:0.08em;">냉동 표시</div>
-    <p>항목에 마우스를 올리면 <b><i class="ph ph-snowflake"></i></b> 버튼이 나타남. 클릭하면 냉동 상태로 표시되고 AI 프롬프트에 자동 반영.</p>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin:16px 0 6px;letter-spacing:0.08em;">카테고리 이동</div>
+      <p>항목 왼쪽 <b><i class="ph ph-dots-six-vertical"></i></b> 핸들을 잡고 다른 카테고리 헤더에 드롭.</p>
 
-    <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin:16px 0 6px;letter-spacing:0.08em;">AI 요리 추천</div>
-    <p>오른쪽 패널에서 <b>프롬프트 생성</b> → 복사 → AI 챗봇에 붙여넣기.</p>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin:16px 0 6px;letter-spacing:0.08em;">냉동 표시</div>
+      <p>항목에 마우스를 올리면 <b><i class="ph ph-snowflake"></i></b> 버튼이 나타남. 클릭하면 냉동 상태로 표시되고 AI 프롬프트에 자동 반영.</p>
 
-    <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin:16px 0 6px;letter-spacing:0.08em;">백업</div>
-    <p>데이터는 브라우저 로컬에 저장됨. 다른 기기로 옮기거나 백업하려면 <b>백업 내보내기</b> → JSON 파일 저장 → 다른 곳에서 <b>백업 불러오기</b>.</p>
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin:16px 0 6px;letter-spacing:0.08em;">AI 요리 추천</div>
+      <p><b>프롬프트 생성</b> → 복사 → AI 챗봇에 붙여넣기. 포함할 레시피를 체크박스로 선택 가능.</p>
+    </div>
+
+    <div id="help-recipes" class="help-section" style="display:none">
+      <p style="color:var(--text-dim);margin-bottom:14px;">자주 만드는 요리의 재료와 조리법을 저장합니다.</p>
+
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:6px;letter-spacing:0.08em;">순서 변경</div>
+      <p>레시피 목록에서 <b><i class="ph ph-dots-six-vertical"></i></b> 핸들을 잡고 드래그하여 순서 변경.</p>
+
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin:16px 0 6px;letter-spacing:0.08em;">식사 기록 연동</div>
+      <p>레시피 편집 화면에서 <b><i class="ph ph-fork-knife"></i> 오늘 식사로 기록</b> 버튼을 누르면 오늘 날짜로 식사기록에 자동 추가.</p>
+    </div>
+
+    <div id="help-meals" class="help-section" style="display:none">
+      <p style="color:var(--text-dim);margin-bottom:14px;">날짜별로 먹은 음식을 기록합니다.</p>
+
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:6px;letter-spacing:0.08em;">프롬프트 반영</div>
+      <p>최근 며칠간의 식사기록을 AI 프롬프트에 포함하여 겹치지 않는 메뉴를 추천받을 수 있음. 기간은 식사기록 탭에서 설정.</p>
+    </div>
+
+    <div id="help-general" class="help-section" style="display:none">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:6px;letter-spacing:0.08em;"><i class="ph ph-warning"></i> 데이터 저장</div>
+      <p>모든 데이터는 브라우저 로컬 저장소에 보관됩니다. <b>브라우저 데이터를 삭제하면 함께 사라질 수 있으니</b> 주기적으로 <b>백업 내보내기</b>를 권장합니다.</p>
+    </div>
 
     <button onclick="document.getElementById('helpModal').style.display='none'" style="margin-top:20px;width:100%" class="accent">닫기</button>
   </div>
@@ -804,6 +831,24 @@ function toggleTheme() {
 }
 
 applyTheme(localStorage.getItem('kitchen_theme') || 'dark');
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    const modal = document.getElementById('helpModal');
+    if (modal.style.display === 'flex') modal.style.display = 'none';
+  }
+});
+
+function switchHelpTab(name, btn) {
+  document.querySelectorAll('.help-section').forEach(s => s.style.display = 'none');
+  document.getElementById('help-' + name).style.display = 'block';
+  document.querySelectorAll('.help-tab-btn').forEach(b => {
+    b.style.color = 'var(--text-dim)';
+    b.style.borderBottomColor = 'transparent';
+  });
+  btn.style.color = 'var(--accent)';
+  btn.style.borderBottomColor = 'var(--accent)';
+}
 
 let toastTimer;
 function showToast(msg) {
