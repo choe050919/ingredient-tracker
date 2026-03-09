@@ -13,15 +13,33 @@
     --border: #2e2e28;
     --border-bright: #4a4a42;
     --text: #d4d0c4;
-    --text-dim: #6b6860;
-    --accent: #c8b84a;
+    --text-dim: #807a70;
+    --accent: #d4c240;
     --accent-dim: #5a5220;
-    --danger: #c84a4a;
+    --danger: #e05555;
     --danger-dim: #52201a;
-    --green: #4ac87a;
+    --green: #45d880;
     --green-dim: #1a5232;
     --mono: 'IBM Plex Mono', monospace;
     --sans: 'IBM Plex Sans KR', sans-serif;
+  }
+
+  :root { color-scheme: dark; }
+  [data-theme="light"] { color-scheme: light; }
+
+  [data-theme="light"] {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --border: #d8d6d0;
+    --border-bright: #b0ada5;
+    --text: #2a2a28;
+    --text-dim: #706e65;
+    --accent: #7a6c00;
+    --accent-dim: #f0ead0;
+    --danger: #c03030;
+    --danger-dim: #fce8e8;
+    --green: #1a7a3a;
+    --green-dim: #e0f5e8;
   }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -159,7 +177,7 @@
     user-select: none;
   }
 
-  .cat-header:hover { background: #1f1f1b; }
+  .cat-header:hover { background: var(--border); }
 
   .cat-label {
     font-family: var(--mono);
@@ -451,7 +469,7 @@
     transition: all 0.15s;
   }
   .recipe-item:hover .recipe-item-del { color: var(--danger); }
-  .recipe-item-del:hover { color: #ff6b6b !important; background: var(--danger-dim); }
+  .recipe-item-del:hover { color: var(--danger) !important; background: var(--danger-dim); }
   .recipe-item:hover .recipe-item-copy { color: var(--text-dim); }
   .recipe-item-copy:hover { color: var(--accent) !important; background: var(--accent-dim); }
   .recipe-item:hover .recipe-item-copy.copied { color: var(--green) !important; }
@@ -549,6 +567,7 @@
   <h1>재료창고</h1>
   <span class="sub">// INGREDIENT TRACKER</span>
   <div class="header-actions">
+    <button id="themeToggle" onclick="toggleTheme()">☀️ 라이트</button>
     <button onclick="document.getElementById('helpModal').style.display='flex'">?  사용법</button>
     <button onclick="exportJSON()">백업 내보내기</button>
     <label><button onclick="document.getElementById('importFile').click()">백업 불러오기</button></label>
@@ -632,7 +651,7 @@
         <textarea class="ai-prompt-area" id="aiExtra" placeholder="추가 조건 (선택)&#10;예: 밥 없음, 20분 이내, 간단한 것"></textarea>
         <button class="green" style="width:100%;margin-bottom:8px" onclick="generatePrompt()">프롬프트 생성</button>
         <div id="promptBox" style="display:none">
-          <textarea class="ai-prompt-area" id="generatedPrompt" style="min-height:160px;font-size:12px;color:#a0a090" readonly></textarea>
+          <textarea class="ai-prompt-area" id="generatedPrompt" style="min-height:160px;font-size:12px;color:var(--text-dim)" readonly></textarea>
           <button class="accent" style="width:100%" onclick="copyPrompt()">📋 복사하기</button>
         </div>
       </div>
@@ -702,6 +721,22 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// THEME
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  const btn = document.getElementById('themeToggle');
+  btn.textContent = theme === 'light' ? '🌙 다크' : '☀️ 라이트';
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'dark';
+  const next = current === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('kitchen_theme', next);
+  applyTheme(next);
+}
+
+applyTheme(localStorage.getItem('kitchen_theme') || 'dark');
+
 let toastTimer;
 function showToast(msg) {
   const el = document.getElementById('toast');
