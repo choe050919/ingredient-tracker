@@ -708,6 +708,7 @@
           <button class="green" style="flex:1" onclick="saveRecipe()">저장</button>
           <button onclick="cancelRecipe()">취소</button>
         </div>
+        <button class="accent" style="width:100%" onclick="logRecipeAsMeal()"><i class="ph ph-fork-knife"></i> 오늘 식사로 기록</button>
       </div>
     </div>
   </div>
@@ -1178,6 +1179,16 @@ function deleteRecipe(id, e) {
   saveRecipes(data);
   if (currentRecipeId === id) cancelRecipe();
   else renderRecipes();
+}
+
+function logRecipeAsMeal() {
+  const title = document.getElementById('recipeTitleInput').value.trim();
+  if (!title) { showToast('레시피 이름이 없습니다'); return; }
+  const today = new Date().toISOString().slice(0, 10);
+  const data = loadMeals();
+  data.push({ id: Date.now(), date: today, name: title });
+  saveMeals(data);
+  showToast(`"${title}" 식사 기록 완료`);
 }
 
 // MEAL LOG
