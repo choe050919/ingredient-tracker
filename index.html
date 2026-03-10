@@ -93,6 +93,23 @@
     gap: 8px;
   }
 
+  .feedback-link {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    border: 1px solid var(--accent-dim);
+    background: transparent;
+    color: var(--accent);
+    padding: 6px 12px;
+    transition: all 0.15s;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .feedback-link:hover { background: var(--accent-dim); }
+
   /* BUTTONS */
   button {
     font-family: var(--mono);
@@ -647,6 +664,7 @@
     <button onclick="exportJSON()">백업 내보내기</button>
     <label><button onclick="document.getElementById('importFile').click()">백업 불러오기</button></label>
     <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
+    <a href="https://docs.google.com/forms/d/e/1FAIpQLScCXFECzVDd0ej7d9tMwV_QeQtxEqhosOlF5K8urwhLXVTUnw/viewform?usp=dialog" target="_blank" rel="noopener" class="feedback-link"><i class="ph ph-chat-dots"></i> 피드백</a>
   </div>
 </header>
 
