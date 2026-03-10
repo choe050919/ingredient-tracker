@@ -116,6 +116,10 @@
   .feedback-link:hover { background: var(--accent-dim); }
 
   /* BUTTONS */
+  button, .feedback-link {
+    white-space: nowrap;
+  }
+
   button {
     font-family: var(--mono);
     font-size: 11px;
@@ -639,9 +643,38 @@
   }
 
   @media (max-width: 700px) {
+    body { padding: 12px; }
+
+    header {
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    header h1 { font-size: 16px; }
+    header .sub { display: none; }
+
+    .header-actions {
+      flex-wrap: wrap;
+      gap: 6px;
+      width: 100%;
+    }
+
+    .tab-btn {
+      padding: 8px 12px;
+      font-size: 11px;
+    }
+
     .main-grid { grid-template-columns: 1fr; }
     .recipe-layout { grid-template-columns: 1fr; }
     .meal-layout { grid-template-columns: 1fr; }
+
+    input.qty-input { width: 60px; }
+    select.cat-select { width: 100px; }
+    .ingredient-item { min-width: 100px; }
+
+    .recipe-list { max-height: 40vh; }
+
+    .help-tabs { flex-wrap: wrap !important; }
+    .help-tab-btn { padding: 6px 10px !important; font-size: 10px !important; }
   }
   /* Phosphor Icons */
   i[class*="ph"] {
