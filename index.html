@@ -1141,7 +1141,7 @@ function generatePrompt() {
     recipeSection = `\n알고 있는 레시피:\n${recipeLines}\n`;
   }
 
-  const prompt = `현재 보유 재료:\n${grouped}\n${mealSection}${recipeSection}\n${extra ? '조건: ' + extra + '\n\n' : ''}이 재료들로 만들 수 있는 식사 3가지를 추천해줘.${recipeSection ? ' 가능하면 내가 알고 있는 레시피를 활용해줘.' : ''}${recentMeals.length > 0 ? ' 최근 식사 기록을 참고해서 겹치지 않게 다양하게 추천해줘.' : ''} 각각 재료 활용도, 난이도, 조리 시간을 간결하게 알려줘.`;
+  const prompt = `추천 전에 먼저 두 가지를 자연스럽게 물어봐라: (1) 오늘 새로운 레시피를 시도하고 싶은지, 익숙한 걸 원하는지. (2) 먼저 소진하고 싶은 재료가 있는지. 사용자 답변을 기다린 후, 이 재료들로 만들 수 있는 식사 3가지를 추천해라.${recipeSection ? ' 가능하면 내가 알고 있는 레시피를 활용해줘.' : ''} 각각 재료 활용도, 난이도, 조리 시간을 간결하게.`;
 
   document.getElementById('generatedPrompt').value = prompt;
   document.getElementById('promptBox').style.display = 'block';
