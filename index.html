@@ -1392,7 +1392,7 @@ function saveMeals(data) { localStorage.setItem(MEAL_KEY, JSON.stringify(data));
 
 function initMealDate() {
   const el = document.getElementById('mealDate');
-  if (el && !el.value) el.value = new Date().toISOString().slice(0,10);
+  if (el) el.value = new Date().toISOString().slice(0,10);
 }
 
 function addMeal() {
