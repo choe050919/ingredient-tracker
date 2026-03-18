@@ -930,6 +930,11 @@ function showToast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('visible'), 2000);
 }
 
+function localDateStr(d) {
+  d = d || new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
 const STORAGE_KEY = 'kitchen_ingredients_v1';
 const MEAL_KEY = 'kitchen_meals_v1';
 const CATEGORIES = ['육류·해산물','채소','유제품·달걀','양념·소스','반찬','건식품·통조림','냉동식품','기타'];
@@ -1125,7 +1130,7 @@ function generatePrompt() {
   const meals = loadMeals();
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
-  const cutoffStr = cutoff.toISOString().slice(0,10);
+  const cutoffStr = localDateStr(cutoff);
   const recentMeals = meals.filter(m => m.date >= cutoffStr);
   let mealSection = '';
   if (recentMeals.length > 0) {
@@ -1166,7 +1171,7 @@ function exportJSON() {
   }, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `kitchen_backup_${new Date().toISOString().slice(0,10)}.json`;
+  a.download = `kitchen_backup_${localDateStr()}.json`;
   a.click();
 }
 
@@ -1380,7 +1385,7 @@ function deleteRecipe(id, e) {
 function logRecipeAsMeal() {
   const title = document.getElementById('recipeTitleInput').value.trim();
   if (!title) { showToast('레시피 이름이 없습니다'); return; }
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDateStr();
   const data = loadMeals();
   const maxOrder = data.filter(m => m.date === today).reduce((mx, m) => Math.max(mx, m.order ?? -1), -1);
   data.push({ id: Date.now(), date: today, name: title, order: maxOrder + 1 });
@@ -1405,7 +1410,7 @@ function saveMeals(data) { localStorage.setItem(MEAL_KEY, JSON.stringify(data));
 
 function initMealDate() {
   const el = document.getElementById('mealDate');
-  if (el) el.value = new Date().toISOString().slice(0,10);
+  if (el) el.value = localDateStr();
 }
 
 function addMeal() {
