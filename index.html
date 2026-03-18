@@ -614,6 +614,9 @@
   .meal-entry { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: var(--bg); border-top: 1px solid var(--border); transition: background 0.1s; }
   .meal-entry:hover { background: var(--surface); }
   .meal-entry-name { flex: 1; font-size: 13px; }
+  .meal-entry-move { font-size: 12px; color: transparent; border: none; background: none; padding: 2px 4px; cursor: pointer; transition: color 0.1s; }
+  .meal-entry:hover .meal-entry-move { color: var(--text-dim); }
+  .meal-entry-move:hover { color: var(--accent) !important; }
   .meal-entry-del { font-family: var(--mono); font-size: 10px; color: transparent; border: none; background: none; padding: 2px 4px; cursor: pointer; transition: color 0.1s; }
   .meal-entry:hover .meal-entry-del { color: var(--danger); }
   .meal-empty { font-family: var(--mono); font-size: 12px; color: var(--text-dim); padding: 40px 0; text-align: center; }
@@ -671,6 +674,7 @@
     select.cat-select { width: 100px; }
     .ingredient-item { min-width: 100px; }
 
+    .meal-entry-move { color: var(--text-dim); }
     .recipe-list { max-height: 40vh; }
 
     .help-tabs { flex-wrap: wrap !important; }
@@ -1378,15 +1382,24 @@ function logRecipeAsMeal() {
   if (!title) { showToast('레시피 이름이 없습니다'); return; }
   const today = new Date().toISOString().slice(0, 10);
   const data = loadMeals();
-  data.push({ id: Date.now(), date: today, name: title });
+  const maxOrder = data.filter(m => m.date === today).reduce((mx, m) => Math.max(mx, m.order ?? -1), -1);
+  data.push({ id: Date.now(), date: today, name: title, order: maxOrder + 1 });
   saveMeals(data);
   showToast(`"${title}" 식사 기록 완료`);
 }
 
 // MEAL LOG
 function loadMeals() {
-  try { return JSON.parse(localStorage.getItem(MEAL_KEY)) || []; }
-  catch { return []; }
+  try {
+    const data = JSON.parse(localStorage.getItem(MEAL_KEY)) || [];
+    if (data.length > 0 && data[0].order === undefined) {
+      const grouped = {};
+      data.forEach(m => { if (!grouped[m.date]) grouped[m.date] = []; grouped[m.date].push(m); });
+      Object.values(grouped).forEach(items => items.forEach((m, i) => m.order = i));
+      localStorage.setItem(MEAL_KEY, JSON.stringify(data));
+    }
+    return data;
+  } catch { return []; }
 }
 function saveMeals(data) { localStorage.setItem(MEAL_KEY, JSON.stringify(data)); }
 
@@ -1400,7 +1413,8 @@ function addMeal() {
   const name = document.getElementById('mealName').value.trim();
   if (!date || !name) return;
   const data = loadMeals();
-  data.push({ id: Date.now(), date, name });
+  const maxOrder = data.filter(m => m.date === date).reduce((mx, m) => Math.max(mx, m.order ?? -1), -1);
+  data.push({ id: Date.now(), date, name, order: maxOrder + 1 });
   saveMeals(data);
   document.getElementById('mealName').value = '';
   renderMeals();
@@ -1408,7 +1422,54 @@ function addMeal() {
 }
 
 function deleteMeal(id) {
-  saveMeals(loadMeals().filter(m => m.id !== id));
+  const data = loadMeals();
+  const meal = data.find(m => m.id === id);
+  const filtered = data.filter(m => m.id !== id);
+  if (meal) {
+    filtered.filter(m => m.date === meal.date).sort((a, b) => a.order - b.order).forEach((m, i) => m.order = i);
+  }
+  saveMeals(filtered);
+  renderMeals();
+}
+
+function shiftDate(dateStr, offset) {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dt = new Date(y, m - 1, d + offset);
+  return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+}
+
+function moveMeal(id, dir) {
+  const data = loadMeals();
+  const meal = data.find(m => m.id === id);
+  if (!meal) return;
+
+  const sameDate = data.filter(m => m.date === meal.date).sort((a, b) => a.order - b.order);
+  const idx = sameDate.findIndex(m => m.id === id);
+
+  if (dir === -1) {
+    // ↑: move up visually
+    if (idx > 0) {
+      const prev = sameDate[idx - 1];
+      [meal.order, prev.order] = [prev.order, meal.order];
+    } else {
+      const newDate = shiftDate(meal.date, 1);
+      const maxOrder = data.filter(m => m.date === newDate).reduce((mx, m) => Math.max(mx, m.order), -1);
+      meal.date = newDate;
+      meal.order = maxOrder + 1;
+    }
+  } else {
+    // ↓: move down visually
+    if (idx < sameDate.length - 1) {
+      const next = sameDate[idx + 1];
+      [meal.order, next.order] = [next.order, meal.order];
+    } else {
+      const newDate = shiftDate(meal.date, -1);
+      data.filter(m => m.date === newDate).forEach(m => m.order += 1);
+      meal.date = newDate;
+      meal.order = 0;
+    }
+  }
+  saveMeals(data);
   renderMeals();
 }
 
@@ -1461,10 +1522,10 @@ function renderMeals() {
     const d = new Date(date + 'T00:00:00');
     const label = `${d.getMonth()+1}/${d.getDate()} (${['일','월','화','수','목','금','토'][d.getDay()]})`;
     block.innerHTML = `<div class="meal-day-header"><span class="meal-day-label">${label}</span><span>${grouped[date].length}끼</span></div>`;
-    grouped[date].forEach(m => {
+    grouped[date].sort((a, b) => a.order - b.order).forEach(m => {
       const el = document.createElement('div');
       el.className = 'meal-entry';
-      el.innerHTML = `<span class="meal-entry-name editable" title="클릭해서 수정" onclick="editMeal(${m.id},this)">${m.name}</span><button class="meal-entry-del" onclick="deleteMeal(${m.id})"><i class="ph ph-x"></i></button>`;
+      el.innerHTML = `<span class="meal-entry-name editable" title="클릭해서 수정" onclick="editMeal(${m.id},this)">${m.name}</span><button class="meal-entry-move" title="위로 / 전날로" onclick="moveMeal(${m.id},-1)"><i class="ph ph-caret-up"></i></button><button class="meal-entry-move" title="아래로 / 다음날로" onclick="moveMeal(${m.id},1)"><i class="ph ph-caret-down"></i></button><button class="meal-entry-del" onclick="deleteMeal(${m.id})"><i class="ph ph-x"></i></button>`;
       block.appendChild(el);
     });
     container.appendChild(block);
