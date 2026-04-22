@@ -880,6 +880,17 @@
           <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-top:10px;line-height:1.7">재료창고 탭의 프롬프트 생성 시 자동으로 포함됩니다.</div>
         </div>
       </div>
+      <div class="panel">
+        <div class="panel-header">식사기록 복사</div>
+        <div class="panel-body">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+            <span style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">최근</span>
+            <input class="meal-days-input" type="number" id="mealCopyDays" value="7" min="1" max="90" style="font-family:var(--mono);font-size:13px;background:var(--surface);border:1px solid var(--border);color:var(--text);padding:6px 10px;outline:none">
+            <span style="font-family:var(--mono);font-size:11px;color:var(--text-dim)">일</span>
+          </div>
+          <button class="accent" style="width:100%" onclick="copyRecentMeals()"><i class="ph ph-clipboard"></i> 식사기록 복사</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1540,6 +1551,26 @@ function renderMeals() {
     <div class="stat-item"><span class="stat-num">${data.length}</span><span class="stat-label">총 기록</span></div>
     <div class="stat-item"><span class="stat-num">${sortedDates.length}</span><span class="stat-label">기록일수</span></div>
   `;
+}
+
+function copyRecentMeals() {
+  const days = parseInt(document.getElementById('mealCopyDays')?.value || '7');
+  const meals = loadMeals();
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - days);
+  const cutoffStr = localDateStr(cutoff);
+  const recent = meals.filter(m => m.date >= cutoffStr);
+  if (recent.length === 0) { showToast('해당 기간에 기록이 없습니다'); return; }
+  const grouped = {};
+  recent.forEach(m => { if (!grouped[m.date]) grouped[m.date] = []; grouped[m.date].push(m); });
+  const lines = Object.keys(grouped).sort((a,b) => a > b ? -1 : 1).map(date => {
+    const d = new Date(date + 'T00:00:00');
+    const label = `${d.getMonth()+1}/${d.getDate()} (${['일','월','화','수','목','금','토'][d.getDay()]})`;
+    const names = grouped[date].sort((a,b) => a.order - b.order).map(m => m.name).join(', ');
+    return `${label}: ${names}`;
+  }).join('\n');
+  const text = `최근 ${days}일 식사기록:\n${lines}`;
+  navigator.clipboard.writeText(text).then(() => showToast('식사기록이 복사되었습니다'));
 }
 
 // init
