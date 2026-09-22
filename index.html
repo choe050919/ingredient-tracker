@@ -737,7 +737,7 @@
       <p>항목에 마우스를 올리면 <b><i class="ph ph-snowflake"></i></b> 버튼이 나타남. 클릭하면 냉동 상태로 표시되고 AI 프롬프트에 자동 반영.</p>
 
       <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin:16px 0 6px;letter-spacing:0.08em;">AI 요리 추천</div>
-      <p><b>프롬프트 생성</b> → 복사 → AI 챗봇에 붙여넣기. 포함할 레시피를 체크박스로 선택 가능.</p>
+      <p><b>재료 목록만 생성</b> → 카테고리별 재료 목록만 간단히 뽑아서 복사. <b>프롬프트 생성</b> → 복사 → AI 챗봇에 붙여넣기. 포함할 레시피를 체크박스로 선택 가능.</p>
     </div>
 
     <div id="help-recipes" class="help-section" style="display:none">
@@ -814,6 +814,7 @@
       <div class="panel-body">
         <textarea class="ai-prompt-area" id="aiExtra" placeholder="추가 조건 (선택)&#10;예: 밥 없음, 20분 이내, 간단한 것"></textarea>
         <div id="recipeCheckList" style="margin-bottom:8px"></div>
+        <button class="accent" style="width:100%;margin-bottom:8px" onclick="generateIngredientList()">재료 목록만 생성</button>
         <button class="green" style="width:100%;margin-bottom:8px" onclick="generatePrompt()">프롬프트 생성</button>
         <div id="promptBox" style="display:none">
           <textarea class="ai-prompt-area" id="generatedPrompt" style="min-height:160px;font-size:12px;color:var(--text-dim)" readonly></textarea>
@@ -1125,16 +1126,27 @@ function toggleAllRecipeChecks() {
   updateRecipeCheckCount();
 }
 
+function buildIngredientListText(data) {
+  return CATEGORIES.map(cat => {
+    const items = data.filter(i => i.cat === cat);
+    if (!items.length) return null;
+    return `[${cat}] ${items.map(i => i.name + (i.frozen ? '(냉동)' : '') + (i.qty ? `(${i.qty})` : '')).join(', ')}`;
+  }).filter(Boolean).join('\n');
+}
+
+function generateIngredientList() {
+  const data = load();
+  if (data.length === 0) { alert('재료를 먼저 추가해주세요.'); return; }
+  document.getElementById('generatedPrompt').value = buildIngredientListText(data);
+  document.getElementById('promptBox').style.display = 'block';
+}
+
 function generatePrompt() {
   const data = load();
   if (data.length === 0) { alert('재료를 먼저 추가해주세요.'); return; }
 
   const extra = document.getElementById('aiExtra').value.trim();
-  const grouped = CATEGORIES.map(cat => {
-    const items = data.filter(i => i.cat === cat);
-    if (!items.length) return null;
-    return `[${cat}] ${items.map(i => i.name + (i.frozen ? '(냉동)' : '') + (i.qty ? `(${i.qty})` : '')).join(', ')}`;
-  }).filter(Boolean).join('\n');
+  const grouped = buildIngredientListText(data);
 
   // recent meals
   const days = parseInt(document.getElementById('mealDays')?.value || '7');
