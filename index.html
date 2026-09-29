@@ -188,6 +188,7 @@
 
   input.name-input { flex: 1; min-width: 120px; }
   input.qty-input { width: 80px; }
+  input.count-input { width: 60px; }
   select.cat-select { width: 120px; }
 
   /* CATEGORY SECTIONS */
@@ -259,6 +260,7 @@
   }
 
   .item-qty { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+  .item-count { font-family: var(--mono); font-size: 11px; color: var(--text-dim); min-width: 22px; text-align: center; border: 1px solid var(--border-bright); padding: 0 5px; }
   .editable { cursor: text; }
   .editable:hover { color: var(--text); }
 
@@ -741,7 +743,7 @@
       <p style="color:var(--text-dim);margin-bottom:14px;">보유 중인 재료를 카테고리별로 관리합니다.</p>
 
       <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:6px;letter-spacing:0.08em;">수정·삭제</div>
-      <p>이름이나 수량을 클릭하면 바로 편집 가능. 마우스를 올리면 삭제 버튼이 나타남.</p>
+      <p>이름, 용량, 개수를 클릭하면 바로 편집 가능. 개수는 클릭해서 입력칸이 열린 상태에서 마우스 휠로 ±1씩 조절(Enter 저장, Esc 취소). 마우스를 올리면 삭제 버튼이 나타남.</p>
 
       <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin:16px 0 6px;letter-spacing:0.08em;">카테고리 이동</div>
       <p>항목 왼쪽 <b><i class="ph ph-dots-six-vertical"></i></b> 핸들을 잡고 다른 카테고리 헤더에 드롭.</p>
@@ -793,7 +795,8 @@
     <!-- ADD FORM -->
     <div class="add-form">
       <input class="name-input" id="nameInput" type="text" placeholder="재료 이름" onkeydown="if(event.key==='Enter') addIngredient()">
-      <input class="qty-input" id="qtyInput" type="text" placeholder="수량/메모">
+      <input class="qty-input" id="qtyInput" type="text" placeholder="용량/메모">
+      <input class="count-input" id="countInput" type="text" inputmode="decimal" placeholder="개수" onkeydown="if(event.key==='Enter') addIngredient()">
       <select class="cat-select" id="catSelect">
         <option value="육류·해산물">육류·해산물</option>
         <option value="채소">채소</option>
@@ -995,10 +998,15 @@ function addIngredient() {
   const qty = document.getElementById('qtyInput').value.trim();
   const cat = document.getElementById('catSelect').value;
   const data = load();
-  data.push({ id: Date.now(), name, qty, cat });
+  const item = { id: Date.now(), name, qty, cat };
+  const countText = document.getElementById('countInput').value.trim();
+  const count = Number(countText);
+  if (countText !== '' && Number.isFinite(count) && count >= 0) item.count = count;
+  data.push(item);
   save(data);
   document.getElementById('nameInput').value = '';
   document.getElementById('qtyInput').value = '';
+  document.getElementById('countInput').value = '';
   renderAll();
   document.getElementById('nameInput').focus();
 }
@@ -1061,6 +1069,7 @@ function renderAll(search = '') {
           <span class="drag-handle" title="드래그"><i class="ph ph-dots-six-vertical"></i></span>
           <span class="item-name editable" title="클릭해서 수정" onclick="startEdit(${item.id},'name',this)">${item.name}</span>
           <span class="item-qty editable" title="클릭해서 수정" onclick="startEdit(${item.id},'qty',this)">${item.qty || '—'}</span>
+          <span class="item-count editable" title="클릭해서 수정 (열린 뒤 마우스 휠로 ±1)" onclick="startEdit(${item.id},'count',this)">${item.count ?? '—'}</span>
           <button class="item-freeze ${item.frozen ? 'on' : ''}" onclick="toggleFrozen(${item.id})" title="냉동 여부"><i class="ph ph-snowflake"></i></button>
           <button class="item-del" onclick="removeIngredient(${item.id})" title="삭제"><i class="ph ph-x"></i></button>
         `;
@@ -1083,26 +1092,36 @@ function toggleFrozen(id) {
 
 function startEdit(id, field, el) {
   if (el.querySelector('input')) return; // already editing
-  const current = field === 'qty' && el.textContent === '—' ? '' : el.textContent;
+  const current = (field === 'qty' || field === 'count') && el.textContent === '—' ? '' : el.textContent;
   const input = document.createElement('input');
   input.value = current;
   input.style.cssText = `
     font-family:var(--mono);font-size:${field==='name'?'13px':'11px'};
     background:var(--surface);border:1px solid var(--accent-dim);
-    color:var(--text);padding:2px 6px;width:${field==='name'?'100px':'60px'};outline:none;
+    color:var(--text);padding:2px 6px;width:${field==='name'?'100px':field==='count'?'46px':'60px'};outline:none;
   `;
   el.textContent = '';
   el.appendChild(input);
   input.focus();
   input.select();
 
+  let done = false;
   const commit = () => {
+    if (done) return;
+    done = true;
     const val = input.value.trim();
     const data = load();
     const item = data.find(i => i.id === id);
     if (!item) return;
     if (field === 'name' && !val) { renderAll(); return; }
-    item[field] = val;
+    if (field === 'count') {
+      const n = Number(val);
+      if (val === '') delete item.count;
+      else if (Number.isFinite(n) && n >= 0) item.count = n;
+      else { renderAll(); return; }
+    } else {
+      item[field] = val;
+    }
     save(data);
     renderAll();
   };
@@ -1110,9 +1129,25 @@ function startEdit(id, field, el) {
   input.addEventListener('blur', commit);
   input.addEventListener('keydown', e => {
     if (e.key === 'Enter') { input.blur(); }
-    if (e.key === 'Escape') { renderAll(); }
+    if (e.key === 'Escape') { done = true; renderAll(); }
     e.stopPropagation();
   });
+
+  if (field === 'count') {
+    input.title = '마우스 휠로 ±1';
+    input.style.cursor = 'ns-resize';
+    let acc = 0, last = 0;
+    input.addEventListener('wheel', e => {
+      if (e.ctrlKey) return;
+      e.preventDefault();
+      const dy = e.deltaY * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 100 : 1);
+      acc = Math.sign(acc) === Math.sign(dy) ? acc + dy : dy;
+      if (Math.abs(acc) < 50 || e.timeStamp - last < 40) return;
+      last = e.timeStamp;
+      input.value = Math.max(0, (Number(input.value) || 0) + (acc < 0 ? 1 : -1));
+      acc = 0;
+    }, { passive: false });
+  }
 }
 
 function renderStats(data) {
@@ -1159,7 +1194,10 @@ function buildIngredientListText(data) {
   return CATEGORIES.map(cat => {
     const items = data.filter(i => i.cat === cat);
     if (!items.length) return null;
-    return `[${cat}] ${items.map(i => i.name + (i.frozen ? '(냉동)' : '') + (i.qty ? `(${i.qty})` : '')).join(', ')}`;
+    return `[${cat}] ${items.map(i => {
+      const amount = [i.qty, i.count].filter(v => v !== undefined && v !== null && v !== '').join(' * ');
+      return i.name + (i.frozen ? '(냉동)' : '') + (amount ? `(${amount})` : '');
+    }).join(', ')}`;
   }).filter(Boolean).join('\n');
 }
 
