@@ -621,6 +621,19 @@
   .meal-entry:hover .meal-entry-del { color: var(--danger); }
   .meal-empty { font-family: var(--mono); font-size: 12px; color: var(--text-dim); padding: 40px 0; text-align: center; }
   .meal-days-input { width: 60px; }
+  .bundle-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .bundle-label { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; color: var(--text-dim); }
+  .bundle-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+  .bundle-empty { font-family: var(--mono); font-size: 11px; color: var(--text-dim); }
+  .bundle-editor { border: 1px solid var(--border); margin-bottom: 16px; }
+  .bundle-row { display: flex; align-items: center; gap: 12px; padding: 8px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+  .bundle-row:first-child { border-top: none; }
+  .bundle-row-name { min-width: 80px; }
+  .bundle-row-items { flex: 1; color: var(--text-dim); }
+  .bundle-row-del { font-family: var(--mono); font-size: 10px; color: var(--text-dim); border: none; background: none; padding: 2px 4px; cursor: pointer; }
+  .bundle-row-del:hover { color: var(--danger); }
+  .bundle-add { display: flex; gap: 8px; padding: 8px 12px; border-top: 1px solid var(--border); flex-wrap: wrap; }
+  .bundle-add input.bundle-name-input { width: 180px; }
 
   /* TOAST */
   .toast {
@@ -755,6 +768,9 @@
 
       <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:6px;letter-spacing:0.08em;">프롬프트 반영</div>
       <p>최근 며칠간의 식사기록을 AI 프롬프트에 포함하여 겹치지 않는 메뉴를 추천받을 수 있음. 기간은 식사기록 탭에서 설정.</p>
+
+      <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin:16px 0 6px;letter-spacing:0.08em;">묶음 식사</div>
+      <p>자주 같이 먹는 음식을 <b>편집</b>에서 묶음으로 만들어두면, 버튼 한 번에 날짜 칸의 날짜로 식사기록에 한 줄로 추가됨. 구성은 쉼표로 구분. 잘못 눌렀으면 기록 옆 <i class="ph ph-x"></i>로 삭제.</p>
     </div>
 
     <div id="help-general" class="help-section" style="display:none">
@@ -856,6 +872,19 @@
 <div id="tab-meals" class="tab-panel">
   <div class="meal-layout">
     <div>
+      <div class="bundle-bar">
+        <span class="bundle-label">묶음 식사</span>
+        <div class="bundle-buttons" id="bundleButtons"></div>
+        <button onclick="toggleBundleEditor()">편집</button>
+      </div>
+      <div class="bundle-editor" id="bundleEditor" style="display:none">
+        <div id="bundleRows"></div>
+        <div class="bundle-add">
+          <input class="bundle-name-input" id="bundleNewName" type="text" placeholder="묶음 이름 (예: 아침)" onkeydown="if(event.key==='Enter') addBundle()">
+          <input class="name-input" id="bundleNewItems" type="text" placeholder="구성, 쉼표로 구분 (예: 그릭요거트 400g, 시리얼 30g)" onkeydown="if(event.key==='Enter') addBundle()">
+          <button class="accent" onclick="addBundle()">+ 묶음 추가</button>
+        </div>
+      </div>
       <div class="meal-add-form">
         <input type="date" id="mealDate">
         <input class="name-input" id="mealName" type="text" placeholder="먹은 음식 이름" onkeydown="if(event.key==='Enter') addMeal()">
@@ -1190,7 +1219,8 @@ function exportJSON() {
     exportedAt: new Date().toISOString(),
     ingredients: load(),
     recipes: loadRecipes(),
-    meals: loadMeals()
+    meals: loadMeals(),
+    mealBundles: loadMealBundles()
   }, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -1208,12 +1238,14 @@ function importJSON(event) {
       const ingredients = json.ingredients || json;
       const recipes = json.recipes || [];
       const meals = json.meals || [];
+      const mealBundles = Array.isArray(json.mealBundles) ? json.mealBundles : null;
       if (!Array.isArray(ingredients)) throw new Error('형식 오류');
-      const msg = `재료 ${ingredients.length}개, 레시피 ${recipes.length}개, 식사기록 ${meals.length}개를 불러옵니다. 기존 데이터를 덮어씁니다.`;
+      const msg = `재료 ${ingredients.length}개, 레시피 ${recipes.length}개, 식사기록 ${meals.length}개${mealBundles ? `, 묶음 식사 ${mealBundles.length}개` : ''}를 불러옵니다. 기존 데이터를 덮어씁니다.`;
       if (confirm(msg)) {
         save(ingredients);
         saveRecipes(recipes);
         saveMeals(meals);
+        if (mealBundles) saveMealBundles(mealBundles);
         renderAll();
       }
     } catch (err) { alert('파일 오류: ' + err.message); }
@@ -1408,11 +1440,7 @@ function deleteRecipe(id, e) {
 function logRecipeAsMeal() {
   const title = document.getElementById('recipeTitleInput').value.trim();
   if (!title) { showToast('레시피 이름이 없습니다'); return; }
-  const today = localDateStr();
-  const data = loadMeals();
-  const maxOrder = data.filter(m => m.date === today).reduce((mx, m) => Math.max(mx, m.order ?? -1), -1);
-  data.push({ id: Date.now(), date: today, name: title, order: maxOrder + 1 });
-  saveMeals(data);
+  pushMeal(localDateStr(), title);
   showToast(`"${title}" 식사 기록 완료`);
 }
 
@@ -1431,6 +1459,143 @@ function loadMeals() {
 }
 function saveMeals(data) { localStorage.setItem(MEAL_KEY, JSON.stringify(data)); }
 
+function pushMeal(date, name) {
+  const data = loadMeals();
+  const maxOrder = data.filter(m => m.date === date).reduce((mx, m) => Math.max(mx, m.order ?? -1), -1);
+  data.push({ id: Date.now(), date, name, order: maxOrder + 1 });
+  saveMeals(data);
+}
+
+// MEAL BUNDLES
+const BUNDLE_KEY = 'kitchen_mealbundles_v1';
+
+function loadMealBundles() {
+  try { return JSON.parse(localStorage.getItem(BUNDLE_KEY)) || []; }
+  catch { return []; }
+}
+function saveMealBundles(data) { localStorage.setItem(BUNDLE_KEY, JSON.stringify(data)); }
+
+function parseBundleItems(text) {
+  return text.split(',').map(s => s.trim()).filter(Boolean);
+}
+
+function bundleMealName(b) {
+  return b.items.length ? `${b.name}(${b.items.join(' + ')})` : b.name;
+}
+
+function logMealBundle(id) {
+  const b = loadMealBundles().find(b => b.id === id);
+  if (!b) return;
+  const date = document.getElementById('mealDate').value || localDateStr();
+  pushMeal(date, bundleMealName(b));
+  renderMeals();
+  const [, mo, d] = date.split('-');
+  showToast(`${+mo}/${+d} "${b.name}" 기록 완료`);
+}
+
+function toggleBundleEditor() {
+  const el = document.getElementById('bundleEditor');
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function addBundle() {
+  const nameEl = document.getElementById('bundleNewName');
+  const itemsEl = document.getElementById('bundleNewItems');
+  const name = nameEl.value.trim();
+  if (!name) return;
+  const data = loadMealBundles();
+  data.push({ id: Date.now(), name, items: parseBundleItems(itemsEl.value) });
+  saveMealBundles(data);
+  nameEl.value = '';
+  itemsEl.value = '';
+  renderBundles();
+  nameEl.focus();
+}
+
+function deleteBundle(id) {
+  saveMealBundles(loadMealBundles().filter(b => b.id !== id));
+  renderBundles();
+}
+
+function editBundle(id, field, el) {
+  if (el.querySelector('input')) return;
+  const bundle = loadMealBundles().find(b => b.id === id);
+  if (!bundle) return;
+  const input = document.createElement('input');
+  input.value = field === 'items' ? bundle.items.join(', ') : bundle.name;
+  input.style.cssText = `font-family:var(--sans);font-size:13px;background:var(--surface);border:1px solid var(--accent-dim);color:var(--text);padding:2px 6px;width:${field === 'items' ? 280 : 120}px;outline:none;`;
+  el.textContent = '';
+  el.appendChild(input);
+  input.focus();
+  input.select();
+  let done = false;
+  const commit = () => {
+    if (done) return;
+    done = true;
+    const val = input.value.trim();
+    if (field === 'items' || val) {
+      const data = loadMealBundles();
+      const b = data.find(b => b.id === id);
+      if (b) {
+        if (field === 'items') b.items = parseBundleItems(val); else b.name = val;
+        saveMealBundles(data);
+      }
+    }
+    renderBundles();
+  };
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') input.blur();
+    if (e.key === 'Escape') { done = true; renderBundles(); }
+    e.stopPropagation();
+  });
+}
+
+function renderBundles() {
+  const buttons = document.getElementById('bundleButtons');
+  const rows = document.getElementById('bundleRows');
+  if (!buttons || !rows) return;
+  const bundles = loadMealBundles();
+
+  buttons.innerHTML = '';
+  if (bundles.length === 0) {
+    const empty = document.createElement('span');
+    empty.className = 'bundle-empty';
+    empty.textContent = '편집에서 묶음을 만들어보세요';
+    buttons.appendChild(empty);
+  }
+  bundles.forEach(b => {
+    const btn = document.createElement('button');
+    btn.className = 'accent';
+    btn.textContent = b.name;
+    btn.title = b.items.join(' + ');
+    btn.onclick = () => logMealBundle(b.id);
+    buttons.appendChild(btn);
+  });
+
+  rows.innerHTML = '';
+  bundles.forEach(b => {
+    const row = document.createElement('div');
+    row.className = 'bundle-row';
+    const name = document.createElement('span');
+    name.className = 'bundle-row-name editable';
+    name.title = '클릭해서 수정';
+    name.textContent = b.name;
+    name.onclick = () => editBundle(b.id, 'name', name);
+    const items = document.createElement('span');
+    items.className = 'bundle-row-items editable';
+    items.title = '클릭해서 수정';
+    items.textContent = b.items.join(', ') || '(구성 없음)';
+    items.onclick = () => editBundle(b.id, 'items', items);
+    const del = document.createElement('button');
+    del.className = 'bundle-row-del';
+    del.innerHTML = '<i class="ph ph-x"></i>';
+    del.onclick = () => deleteBundle(b.id);
+    row.append(name, items, del);
+    rows.appendChild(row);
+  });
+}
+
 function initMealDate() {
   const el = document.getElementById('mealDate');
   if (el) el.value = localDateStr();
@@ -1440,10 +1605,7 @@ function addMeal() {
   const date = document.getElementById('mealDate').value;
   const name = document.getElementById('mealName').value.trim();
   if (!date || !name) return;
-  const data = loadMeals();
-  const maxOrder = data.filter(m => m.date === date).reduce((mx, m) => Math.max(mx, m.order ?? -1), -1);
-  data.push({ id: Date.now(), date, name, order: maxOrder + 1 });
-  saveMeals(data);
+  pushMeal(date, name);
   document.getElementById('mealName').value = '';
   renderMeals();
   document.getElementById('mealName').focus();
@@ -1528,6 +1690,7 @@ function editMeal(id, el) {
 }
 
 function renderMeals() {
+  renderBundles();
   const data = loadMeals();
   const container = document.getElementById('mealList');
   if (!container) return;

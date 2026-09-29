@@ -19,7 +19,7 @@ Open `index.html` in a browser. No build or dev server required.
 2. 레시피 (Recipes) — Create/edit/delete recipes with a list+editor layout
 3. 식사기록 (Meal Log) — Log meals by date, used by the AI prompt generator for context
 
-**Data persistence**: All state stored in `localStorage` under keys `kitchen_ingredients_v1`, `kitchen_recipes_v1`, `kitchen_meals_v1`. Export/import via JSON file backup.
+**Data persistence**: All state stored in `localStorage` under keys `kitchen_ingredients_v1`, `kitchen_recipes_v1`, `kitchen_meals_v1`, `kitchen_mealbundles_v1`. Export/import via JSON file backup.
 
 **AI integration**: `generatePrompt()` builds an LLM-friendly ingredient list with recent meal history (configurable lookback window) for recipe suggestions. Copied to clipboard via `copyPrompt()`.
 
