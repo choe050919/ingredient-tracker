@@ -752,7 +752,7 @@
       <p>항목에 마우스를 올리면 <b><i class="ph ph-snowflake"></i></b> 버튼이 나타남. 클릭하면 냉동 상태로 표시되고 AI 프롬프트에 자동 반영.</p>
 
       <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin:16px 0 6px;letter-spacing:0.08em;">AI 요리 추천</div>
-      <p><b>재료 목록만 생성</b> → 카테고리별 재료 목록만 간단히 뽑아서 복사. <b>프롬프트 생성</b> → 복사 → AI 챗봇에 붙여넣기. 포함할 레시피를 체크박스로 선택 가능.</p>
+      <p><b>재료 목록만 생성 및 복사</b> → 카테고리별 재료 목록만 간단히 뽑아서 바로 복사. <b>프롬프트 생성 및 복사</b> → 생성과 동시에 복사 → AI 챗봇에 붙여넣기. 포함할 레시피를 체크박스로 선택 가능.</p>
     </div>
 
     <div id="help-recipes" class="help-section" style="display:none">
@@ -833,8 +833,8 @@
       <div class="panel-body">
         <textarea class="ai-prompt-area" id="aiExtra" placeholder="추가 조건 (선택)&#10;예: 밥 없음, 20분 이내, 간단한 것"></textarea>
         <div id="recipeCheckList" style="margin-bottom:8px"></div>
-        <button class="accent" style="width:100%;margin-bottom:8px" onclick="generateIngredientList()">재료 목록만 생성</button>
-        <button class="green" style="width:100%;margin-bottom:8px" onclick="generatePrompt()">프롬프트 생성</button>
+        <button class="accent" style="width:100%;margin-bottom:8px" onclick="generateIngredientList()">재료 목록만 생성 및 복사</button>
+        <button class="green" style="width:100%;margin-bottom:8px" onclick="generatePrompt()">프롬프트 생성 및 복사</button>
         <div id="promptBox" style="display:none">
           <textarea class="ai-prompt-area" id="generatedPrompt" style="min-height:160px;font-size:12px;color:var(--text-dim)" readonly></textarea>
           <button class="accent" style="width:100%" onclick="copyPrompt()"><i class="ph ph-clipboard"></i> 복사하기</button>
@@ -1206,6 +1206,7 @@ function generateIngredientList() {
   if (data.length === 0) { alert('재료를 먼저 추가해주세요.'); return; }
   document.getElementById('generatedPrompt').value = buildIngredientListText(data);
   document.getElementById('promptBox').style.display = 'block';
+  copyPrompt('재료 목록');
 }
 
 function generatePrompt() {
@@ -1244,11 +1245,14 @@ function generatePrompt() {
 
   document.getElementById('generatedPrompt').value = prompt;
   document.getElementById('promptBox').style.display = 'block';
+  copyPrompt('프롬프트');
 }
 
-function copyPrompt() {
+function copyPrompt(label = '프롬프트') {
   const text = document.getElementById('generatedPrompt').value;
-  navigator.clipboard.writeText(text).then(() => showToast('프롬프트가 복사되었습니다'));
+  navigator.clipboard.writeText(text)
+    .then(() => showToast(`${label} 복사 완료`))
+    .catch(() => showToast('복사하지 못했습니다. 복사하기 버튼을 눌러주세요'));
 }
 
 function exportJSON() {
