@@ -1522,7 +1522,7 @@ function parseBundleItems(text) {
 }
 
 function bundleMealName(b) {
-  return b.items.length ? `${b.name}(${b.items.join(' + ')})` : b.name;
+  return b.items.length ? `${b.name}: ${b.items.join(' + ')}` : b.name;
 }
 
 function logMealBundle(id) {
