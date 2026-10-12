@@ -115,6 +115,38 @@
   }
   .feedback-link:hover { background: var(--accent-dim); }
 
+  .sync-status {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    align-self: center;
+  }
+
+  .auth-gate {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 24px;
+    text-align: center;
+  }
+  .auth-gate-title {
+    font-family: var(--mono);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+  }
+  .auth-gate-msg {
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
   /* BUTTONS */
   button, .feedback-link {
     white-space: nowrap;
@@ -716,6 +748,8 @@
   <h1>재료창고</h1>
   <span class="sub">// INGREDIENT TRACKER</span>
   <div class="header-actions">
+    <span class="sync-status" id="syncStatus"></span>
+    <button onclick="cloud.signOut()" title="로그아웃"><span id="accountEmail"></span> <i class="ph ph-sign-out"></i></button>
     <button id="themeToggle" onclick="toggleTheme()"><i class="ph ph-sun"></i> 라이트</button>
     <button onclick="document.getElementById('helpModal').style.display='flex'">?  사용법</button>
     <button onclick="exportJSON()">백업 내보내기</button>
@@ -724,6 +758,13 @@
     <a href="https://docs.google.com/forms/d/e/1FAIpQLScCXFECzVDd0ej7d9tMwV_QeQtxEqhosOlF5K8urwhLXVTUnw/viewform?usp=dialog" target="_blank" rel="noopener" class="feedback-link"><i class="ph ph-chat-dots"></i> 피드백</a>
   </div>
 </header>
+
+<div class="auth-gate" id="authGate">
+  <div class="auth-gate-title">재료창고</div>
+  <div class="auth-gate-msg" id="authGateMsg">불러오는 중...</div>
+  <button class="accent" id="authGateLogin" style="display:none" onclick="cloud.signIn()"><i class="ph ph-google-logo"></i> Google로 로그인</button>
+  <button id="authGateLogout" style="display:none" onclick="cloud.signOut()">로그아웃</button>
+</div>
 
 <div id="helpModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:100;align-items:center;justify-content:center;" onclick="if(event.target===this)this.style.display='none'" onkeydown="if(event.key==='Escape')this.style.display='none'">
   <div style="background:var(--surface);border:1px solid var(--border-bright);max-width:520px;width:90%;padding:28px;font-size:13px;line-height:1.8;position:relative;max-height:85vh;overflow-y:auto;">
@@ -777,7 +818,7 @@
 
     <div id="help-general" class="help-section" style="display:none">
       <div style="font-family:var(--mono);font-size:11px;color:var(--text-dim);margin-bottom:6px;letter-spacing:0.08em;"><i class="ph ph-warning"></i> 데이터 저장</div>
-      <p>모든 데이터는 브라우저 로컬 저장소에 보관됩니다. <b>브라우저 데이터를 삭제하면 함께 사라질 수 있으니</b> 주기적으로 <b>백업 내보내기</b>를 권장합니다.</p>
+      <p>데이터는 로그인한 Google 계정으로 서버에 저장되어 여러 기기에서 같은 기록을 볼 수 있습니다. 인터넷이 끊겨도 계속 쓸 수 있고, 그동안의 변경은 연결되면 올라갑니다. 헤더의 <b>저장 대기</b>는 아직 서버에 올라가지 않은 변경이 있다는 뜻입니다. 만일을 위해 가끔 <b>백업 내보내기</b>를 권장합니다.</p>
     </div>
 
   </div>
@@ -979,18 +1020,87 @@ function localDateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
-const STORAGE_KEY = 'kitchen_ingredients_v1';
-const MEAL_KEY = 'kitchen_meals_v1';
 const CATEGORIES = ['육류·해산물','채소','유제품·달걀','양념·소스','반찬','건식품·통조림','냉동식품','기타'];
 
-function load() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
-  catch { return []; }
+// STORE
+// In-memory copy of the Firestore collections. load*() return clones so callers can mutate freely;
+// save*() diff against the copy and write only changed/removed items (one document per item).
+const store = { ingredients: [], recipes: [], meals: [], mealBundles: [] };
+const ORDERED_KINDS = ['recipes']; // array order is user-defined; persisted as a pos field
+let storeReady = false;
+
+let lastId = 0;
+function newId() {
+  lastId = Math.max(Date.now(), lastId + 1);
+  return lastId;
 }
 
-function save(data) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+function canonical(item) {
+  return JSON.stringify(item, Object.keys(item).sort());
 }
+
+function toDoc(kind, item, index) {
+  return ORDERED_KINDS.includes(kind) ? { ...item, pos: index } : item;
+}
+
+function loadKind(kind) {
+  return structuredClone(store[kind]);
+}
+
+function saveKind(kind, data) {
+  if (!storeReady || !window.cloud) {
+    showToast('아직 데이터를 불러오는 중입니다');
+    return Promise.reject(new Error('store not ready'));
+  }
+  const ids = data.map(i => i.id);
+  if (new Set(ids).size !== ids.length) {
+    alert('저장 중단: 같은 id를 가진 항목이 있습니다');
+    return Promise.reject(new Error('duplicate id'));
+  }
+  const prev = new Map(store[kind].map((item, i) => [item.id, canonical(toDoc(kind, item, i))]));
+  const upserts = [];
+  data.forEach((item, i) => {
+    const doc = toDoc(kind, item, i);
+    if (prev.get(item.id) !== canonical(doc)) upserts.push(doc);
+  });
+  const keep = new Set(ids);
+  const deletes = store[kind].filter(item => !keep.has(item.id)).map(item => item.id);
+  store[kind] = structuredClone(data);
+  return cloud.write(kind, upserts, deletes);
+}
+
+// Called by the Firestore listener with the collection's current items (pos already stripped).
+function applyRemote(kind, items) {
+  const same = items.length === store[kind].length &&
+    items.every((item, i) => canonical(item) === canonical(store[kind][i]));
+  if (same) return;
+  store[kind] = items;
+  if (storeReady) scheduleRender();
+}
+
+let renderDeferred = false;
+function scheduleRender() {
+  const editing = document.activeElement &&
+    document.activeElement.closest('#categories, #recipeListItems, #bundleRows, #mealList');
+  if (editing) {
+    if (!renderDeferred) {
+      renderDeferred = true;
+      editing.addEventListener('focusout', () => { renderDeferred = false; setTimeout(scheduleRender, 0); }, { once: true });
+    }
+    return;
+  }
+  renderAll(document.querySelector('.search-bar').value);
+  renderRecipes();
+  renderMeals();
+}
+
+function onStoreReady() {
+  storeReady = true;
+  renderAll();
+}
+
+function load() { return loadKind('ingredients'); }
+function save(data) { return saveKind('ingredients', data); }
 
 function addIngredient() {
   const name = document.getElementById('nameInput').value.trim();
@@ -998,7 +1108,7 @@ function addIngredient() {
   const qty = document.getElementById('qtyInput').value.trim();
   const cat = document.getElementById('catSelect').value;
   const data = load();
-  const item = { id: Date.now(), name, qty, cat };
+  const item = { id: newId(), name, qty, cat };
   const countText = document.getElementById('countInput').value.trim();
   const count = Number(countText);
   if (countText !== '' && Number.isFinite(count) && count >= 0) item.count = count;
@@ -1274,7 +1384,8 @@ function importJSON(event) {
   const file = event.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
+    let incoming;
     try {
       const json = JSON.parse(e.target.result);
       const ingredients = json.ingredients || json;
@@ -1282,15 +1393,27 @@ function importJSON(event) {
       const meals = json.meals || [];
       const mealBundles = Array.isArray(json.mealBundles) ? json.mealBundles : null;
       if (!Array.isArray(ingredients)) throw new Error('형식 오류');
-      const msg = `재료 ${ingredients.length}개, 레시피 ${recipes.length}개, 식사기록 ${meals.length}개${mealBundles ? `, 묶음 식사 ${mealBundles.length}개` : ''}를 불러옵니다. 기존 데이터를 덮어씁니다.`;
-      if (confirm(msg)) {
-        save(ingredients);
-        saveRecipes(recipes);
-        saveMeals(meals);
-        if (mealBundles) saveMealBundles(mealBundles);
-        renderAll();
-      }
-    } catch (err) { alert('파일 오류: ' + err.message); }
+      fillMealOrder(meals);
+      incoming = { ingredients, recipes, meals };
+      if (mealBundles) incoming.mealBundles = mealBundles;
+    } catch (err) { alert('파일 오류: ' + err.message); return; }
+
+    const msg = `재료 ${incoming.ingredients.length}개, 레시피 ${incoming.recipes.length}개, 식사기록 ${incoming.meals.length}개${incoming.mealBundles ? `, 묶음 식사 ${incoming.mealBundles.length}개` : ''}를 불러옵니다. 기존 데이터를 덮어씁니다.`;
+    if (!confirm(msg)) return;
+    showToast('서버에 저장하는 중...');
+    try {
+      await Promise.all(Object.entries(incoming).map(([kind, data]) => saveKind(kind, data)));
+    } catch (err) {
+      renderAll();
+      alert('저장 실패: ' + err.message + '\n원본 파일은 그대로이니 다시 불러올 수 있습니다.');
+      return;
+    }
+    renderAll();
+    try {
+      alert(await cloud.verifyAgainst(incoming));
+    } catch (err) {
+      alert('저장은 끝났지만 서버 확인에 실패했습니다: ' + err.message);
+    }
   };
   reader.readAsText(file);
   event.target.value = '';
@@ -1322,17 +1445,10 @@ function switchTab(name) {
 }
 
 // RECIPES
-const RECIPE_KEY = 'kitchen_recipes_v1';
 let currentRecipeId = null;
 
-function loadRecipes() {
-  try { return JSON.parse(localStorage.getItem(RECIPE_KEY)) || []; }
-  catch { return []; }
-}
-
-function saveRecipes(data) {
-  localStorage.setItem(RECIPE_KEY, JSON.stringify(data));
-}
+function loadRecipes() { return loadKind('recipes'); }
+function saveRecipes(data) { return saveKind('recipes', data); }
 
 function renderRecipes() {
   const data = loadRecipes();
@@ -1442,7 +1558,7 @@ function saveRecipe() {
     const r = data.find(r => r.id === currentRecipeId);
     if (r) { r.title = title; r.body = body; }
   } else {
-    currentRecipeId = Date.now();
+    currentRecipeId = newId();
     data.push({ id: currentRecipeId, title, body });
   }
   saveRecipes(data);
@@ -1487,35 +1603,27 @@ function logRecipeAsMeal() {
 }
 
 // MEAL LOG
-function loadMeals() {
-  try {
-    const data = JSON.parse(localStorage.getItem(MEAL_KEY)) || [];
-    if (data.length > 0 && data[0].order === undefined) {
-      const grouped = {};
-      data.forEach(m => { if (!grouped[m.date]) grouped[m.date] = []; grouped[m.date].push(m); });
-      Object.values(grouped).forEach(items => items.forEach((m, i) => m.order = i));
-      localStorage.setItem(MEAL_KEY, JSON.stringify(data));
-    }
-    return data;
-  } catch { return []; }
+function loadMeals() { return loadKind('meals'); }
+function saveMeals(data) { return saveKind('meals', data); }
+
+// Backups from before the order field existed: number meals within each date in array order.
+function fillMealOrder(meals) {
+  if (meals.length === 0 || meals[0].order !== undefined) return;
+  const grouped = {};
+  meals.forEach(m => { if (!grouped[m.date]) grouped[m.date] = []; grouped[m.date].push(m); });
+  Object.values(grouped).forEach(items => items.forEach((m, i) => m.order = i));
 }
-function saveMeals(data) { localStorage.setItem(MEAL_KEY, JSON.stringify(data)); }
 
 function pushMeal(date, name) {
   const data = loadMeals();
   const maxOrder = data.filter(m => m.date === date).reduce((mx, m) => Math.max(mx, m.order ?? -1), -1);
-  data.push({ id: Date.now(), date, name, order: maxOrder + 1 });
+  data.push({ id: newId(), date, name, order: maxOrder + 1 });
   saveMeals(data);
 }
 
 // MEAL BUNDLES
-const BUNDLE_KEY = 'kitchen_mealbundles_v1';
-
-function loadMealBundles() {
-  try { return JSON.parse(localStorage.getItem(BUNDLE_KEY)) || []; }
-  catch { return []; }
-}
-function saveMealBundles(data) { localStorage.setItem(BUNDLE_KEY, JSON.stringify(data)); }
+function loadMealBundles() { return loadKind('mealBundles'); }
+function saveMealBundles(data) { return saveKind('mealBundles', data); }
 
 function parseBundleItems(text) {
   return text.split(',').map(s => s.trim()).filter(Boolean);
@@ -1546,7 +1654,7 @@ function addBundle() {
   const name = nameEl.value.trim();
   if (!name) return;
   const data = loadMealBundles();
-  data.push({ id: Date.now(), name, items: parseBundleItems(itemsEl.value) });
+  data.push({ id: newId(), name, items: parseBundleItems(itemsEl.value) });
   saveMealBundles(data);
   nameEl.value = '';
   itemsEl.value = '';
@@ -1790,8 +1898,153 @@ function copyRecentMeals() {
   navigator.clipboard.writeText(text).then(() => showToast('식사기록이 복사되었습니다'));
 }
 
-// init
-renderAll();
+// init: rendering starts from onStoreReady() once the Firestore listeners deliver data
+</script>
 
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
+import {
+  initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+  collection, doc, onSnapshot, writeBatch, getDocsFromServer
+} from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+
+// Public by design: access is enforced by Firestore security rules, not by hiding this config.
+const firebaseConfig = {
+  apiKey: 'AIzaSyBq0MqLH5_sdL4vaS1_sgdNHgHMO_1O3RM',
+  authDomain: 'ingredient-tracker-4c6fa.firebaseapp.com',
+  projectId: 'ingredient-tracker-4c6fa',
+  storageBucket: 'ingredient-tracker-4c6fa.firebasestorage.app',
+  messagingSenderId: '594481951818',
+  appId: '1:594481951818:web:f1012f3733ee4f8940a2b3'
+};
+
+const KINDS = ['ingredients', 'recipes', 'meals', 'mealBundles'];
+const KIND_LABELS = { ingredients: '재료', recipes: '레시피', meals: '식사기록', mealBundles: '묶음 식사' };
+const BATCH_LIMIT = 500;
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+  ignoreUndefinedProperties: true
+});
+
+let uid = null;
+const gate = document.getElementById('authGate');
+const gateMsg = document.getElementById('authGateMsg');
+const gateLogin = document.getElementById('authGateLogin');
+const gateLogout = document.getElementById('authGateLogout');
+
+function showGate(msg, { login = false, logout = false } = {}) {
+  gate.style.display = 'flex';
+  gateMsg.textContent = msg;
+  gateLogin.style.display = login ? '' : 'none';
+  gateLogout.style.display = logout ? '' : 'none';
+}
+
+function kindRef(kind) {
+  return collection(db, 'users', uid, kind);
+}
+
+function itemsFromDocs(kind, docs) {
+  const items = docs.map(d => d.data());
+  if (ORDERED_KINDS.includes(kind)) items.sort((a, b) => (a.pos - b.pos) || (a.id - b.id));
+  else items.sort((a, b) => a.id - b.id);
+  items.forEach(item => delete item.pos);
+  return items;
+}
+
+// Sync status shown in the header: offline / unsent local writes / in sync.
+const syncState = {};
+function updateSyncStatus() {
+  const states = Object.values(syncState);
+  const el = document.getElementById('syncStatus');
+  if (states.some(s => s.pending)) el.textContent = '저장 대기';
+  else if (states.some(s => s.fromCache)) el.textContent = '오프라인';
+  else el.textContent = '동기화됨';
+}
+
+function startListeners() {
+  const received = new Set();
+  KINDS.forEach(kind => {
+    onSnapshot(kindRef(kind), { includeMetadataChanges: true }, snap => {
+      syncState[kind] = { pending: snap.metadata.hasPendingWrites, fromCache: snap.metadata.fromCache };
+      updateSyncStatus();
+      applyRemote(kind, itemsFromDocs(kind, snap.docs));
+      if (!received.has(kind)) {
+        received.add(kind);
+        if (received.size === KINDS.length) {
+          gate.style.display = 'none';
+          onStoreReady();
+        }
+      }
+    }, err => {
+      if (err.code === 'permission-denied') {
+        showGate(`${auth.currentUser?.email ?? '이 계정'}은(는) 접근 권한이 없습니다.`, { logout: true });
+      } else {
+        showGate('데이터를 불러오지 못했습니다: ' + err.code, { logout: true });
+      }
+    });
+  });
+}
+
+window.cloud = {
+  signIn() {
+    signInWithPopup(auth, new GoogleAuthProvider())
+      .catch(err => showGate('로그인 실패: ' + err.code, { login: true }));
+  },
+  signOut() {
+    signOut(auth).then(() => location.reload());
+  },
+  write(kind, upserts, deletes) {
+    const ops = [
+      ...upserts.map(item => batch => batch.set(doc(kindRef(kind), String(item.id)), item)),
+      ...deletes.map(id => batch => batch.delete(doc(kindRef(kind), String(id))))
+    ];
+    const commits = [];
+    for (let i = 0; i < ops.length; i += BATCH_LIMIT) {
+      const batch = writeBatch(db);
+      ops.slice(i, i + BATCH_LIMIT).forEach(op => op(batch));
+      commits.push(batch.commit());
+    }
+    const done = Promise.all(commits);
+    done.catch(err => showToast('저장 실패: ' + err.code));
+    return done;
+  },
+  // Reads every given collection from the server (bypassing the local cache) and compares it with the expected arrays.
+  async verifyAgainst(expected) {
+    const lines = [];
+    let allMatch = true;
+    for (const [kind, items] of Object.entries(expected)) {
+      const snap = await getDocsFromServer(kindRef(kind));
+      const server = new Map(itemsFromDocs(kind, snap.docs).map(item => [item.id, canonical(item)]));
+      const mismatched = items.filter(item => server.get(item.id) !== canonical(item)).length;
+      const ok = server.size === items.length && mismatched === 0;
+      if (!ok) allMatch = false;
+      lines.push(`${KIND_LABELS[kind]}: 파일 ${items.length} / 서버 ${server.size}${mismatched ? ` (내용 불일치 ${mismatched})` : ''} ${ok ? '✓' : '✗'}`);
+    }
+    if (expected.recipes) {
+      const snap = await getDocsFromServer(kindRef('recipes'));
+      const order = itemsFromDocs('recipes', snap.docs).map(r => r.id).join();
+      if (order !== expected.recipes.map(r => r.id).join()) {
+        allMatch = false;
+        lines.push('레시피 순서가 파일과 다릅니다 ✗');
+      }
+    }
+    return `${allMatch ? '서버 확인: 모두 일치' : '서버 확인: 불일치 있음'}\n\n${lines.join('\n')}`;
+  }
+};
+
+onAuthStateChanged(auth, user => {
+  if (!user) {
+    showGate('Google 계정으로 로그인하세요.', { login: true });
+    return;
+  }
+  uid = user.uid;
+  document.getElementById('accountEmail').textContent = user.email;
+  showGate('불러오는 중...');
+  startListeners();
+});
 </script>
 </html>
