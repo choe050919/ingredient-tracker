@@ -23,6 +23,8 @@ Serve the folder over http (`python -m http.server 8756`, also in `.claude/launc
 
 **Data persistence**: Firestore project `ingredient-tracker-4c6fa`, one document per item at `users/{uid}/{ingredients|recipes|meals|mealBundles}/{id}`. Recipes carry a `pos` field for their user-defined order; the other kinds are ordered by `id`. Security rules (set in the Firebase console, not in this repo) allow only the owner's uid. The app keeps an in-memory copy (`store`); `load*()` return clones and `save*()` write only the items that changed or were removed, so callers keep the synchronous load → mutate → save pattern. Item ids come from `newId()` (monotonic, never two in the same millisecond) because ids are document keys. Firestore's persistent cache gives offline use; unsent writes show as 저장 대기 in the header. Export/import via JSON file backup; import reads the collections back from the server and compares them with the file. Only the theme stays in `localStorage` (`kitchen_theme`).
 
+**External reader**: `C:\Users\choe0\Desktop\일상\.meal-rec\read_kitchen.py` (outside this repo) reads `ingredients`, `meals`, `recipes` and `mealBundles` with a read-only service account; a daily meal-recommendation routine and the `kitchen-data` skill depend on it. Changing collection paths or field names requires updating that script too.
+
 **AI integration**: `generatePrompt()` builds an LLM-friendly ingredient list with recent meal history (configurable lookback window) for recipe suggestions. Copied to clipboard via `copyPrompt()`.
 
 ## Key Conventions
